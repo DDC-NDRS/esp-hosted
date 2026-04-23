@@ -331,10 +331,6 @@ static const cmd_arg_t unsubscribe_event_args[] = {
 	{"--event", "Event to unsubscribe from", ARG_TYPE_CHOICE, true, event_choices}
 };
 
-static const cmd_arg_t custom_rpc_request_args[] = {
-	{"--demo", "Demo number (1, 2, or 3)", ARG_TYPE_INT, true, NULL}
-};
-
 static const cmd_arg_t set_country_code_args[] = {
 	{"--code", "Country code (e.g. US, IN, CN)", ARG_TYPE_STRING, true, NULL}
 };
@@ -405,7 +401,7 @@ static const shell_command_t commands[] = {
 	{"heartbeat", "Configure heartbeat", handle_heartbeat, heartbeat_args, sizeof(heartbeat_args)/sizeof(cmd_arg_t)},
 	{"subscribe_event", "Subscribe to events", handle_subscribe_event, subscribe_event_args, sizeof(subscribe_event_args)/sizeof(cmd_arg_t)},
 	{"unsubscribe_event", "Unsubscribe from events", handle_unsubscribe_event, unsubscribe_event_args, sizeof(unsubscribe_event_args)/sizeof(cmd_arg_t)},
-	{"custom_demo_rpc_request", "Send custom RPC demo request and wait for response", handle_custom_demo_rpc_request, custom_rpc_request_args, sizeof(custom_rpc_request_args)/sizeof(cmd_arg_t)},
+	{"peer_data_example", "Run peer data transfer example", handle_peer_data_example, NULL, 0},
 	{"cli_set_host_port_range", "Set host port range", handle_set_host_port_range, NULL, 0},
 	{"exit", "Exit the shell", handle_exit, NULL, 0},
 	{"quit", "Exit the shell", handle_exit, NULL, 0},
