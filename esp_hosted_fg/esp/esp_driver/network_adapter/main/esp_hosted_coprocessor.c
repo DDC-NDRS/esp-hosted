@@ -93,7 +93,7 @@ static struct rx_data {
 	uint8_t valid;
 	uint16_t cur_seq_no;
 	int len;
-	uint8_t data[4096];
+	uint8_t *data;
 } r;
 
 /* Add at the top with other static variables */
@@ -361,12 +361,11 @@ static void process_serial_rx_pkt(uint8_t *buf)
 	struct esp_payload_header *header = NULL;
 	uint16_t payload_len = 0;
 	uint8_t *payload = NULL;
-	int rem_buff_size;
+	uint8_t *new_data = NULL;
 
 	header = (struct esp_payload_header *) buf;
 	payload_len = le16toh(header->len);
 	payload = buf + le16toh(header->offset);
-	rem_buff_size = sizeof(r.data) - r.len;
 
 	ESP_HEXLOGV("serial_rx", payload, payload_len, 32);
 
@@ -390,8 +389,19 @@ static void process_serial_rx_pkt(uint8_t *buf)
 		return;
 	}
 
-	memcpy((r.data + r.len), payload, min(payload_len, rem_buff_size));
-	r.len += min(payload_len, rem_buff_size);
+	new_data = realloc(r.data, r.len + payload_len);
+	if (!new_data) {
+		ESP_LOGE(TAG, "serial rx realloc failed (need %d bytes), dropping",
+			r.len + payload_len);
+		free(r.data);
+		r.data = NULL;
+		r.len = 0;
+		r.cur_seq_no = 0;
+		return;
+	}
+	r.data = new_data;
+	memcpy(r.data + r.len, payload, payload_len);
+	r.len += payload_len;
 
 	if (!(header->flags & MORE_FRAGMENT)) {
 		/* Received complete buffer */
@@ -514,6 +524,8 @@ static ssize_t serial_read_data(uint8_t *data, ssize_t len)
 	len = min(len, r.len);
 	if (r.valid) {
 		memcpy(data, r.data, len);
+		free(r.data);
+		r.data = NULL;
 		r.valid = 0;
 		r.len = 0;
 		r.cur_seq_no = 0;
