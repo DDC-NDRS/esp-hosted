@@ -262,8 +262,8 @@ static int ctrl_app_parse_event(CtrlMsg *ctrl_msg, ctrl_cmd_t *app_ntfy)
 					ctrl_msg->event_station_connected_to_esp_softap->aid;
 				app_ntfy->u.e_softap_sta_conn.is_mesh_child =
 					ctrl_msg->event_station_connected_to_esp_softap->is_mesh_child;
-				break;
 			}
+			break;
 		} case CTRL_EVENT_STATION_DISCONNECT_FROM_ESP_SOFTAP: {
 			CHECK_CTRL_MSG_NON_NULL(event_station_disconnect_from_esp_softap);
 			app_ntfy->resp_event_status =
