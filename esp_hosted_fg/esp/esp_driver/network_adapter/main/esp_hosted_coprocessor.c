@@ -63,7 +63,9 @@
 #endif
 #include "nw_split_router.h"
 
-#include "esp_hosted_custom_rpc.h"
+#ifdef CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_PEER_DATA
+#include "peer_data_example.h"
+#endif
 
 static const char TAG[] = "fg_slave";
 
@@ -102,9 +104,6 @@ static struct rx_data {
 static int dhcp_dns_retry_count = 0;
 static TimerHandle_t delayed_dhcp_dns_timer = NULL;
 #endif
-
-static esp_err_t handle_custom_unserialised_rpc_request(const custom_rpc_unserialised_data_t *req, custom_rpc_unserialised_data_t *resp_out);
-esp_err_t create_and_send_custom_rpc_unserialised_event(uint32_t custom_event_id, const void *data, size_t data_len);
 
 static void print_firmware_version()
 {
@@ -1052,8 +1051,9 @@ esp_err_t esp_hosted_coprocessor_init(void)
   #endif
 
 	/* Register how you are going to handle the user defined RPC requests */
-
-	register_custom_rpc_unserialised_req_handler(handle_custom_unserialised_rpc_request);
+#ifdef CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_PEER_DATA
+	peer_data_example_register();
+#endif
 
 	return ESP_OK;
 }
@@ -1081,106 +1081,3 @@ void app_main(void)
 
 }
 
-/* Example callback functions */
-static esp_err_t handle_custom_unserialised_rpc_request(const custom_rpc_unserialised_data_t *req, custom_rpc_unserialised_data_t *resp_out) {
-	/* --------- Caution ----------
-	 *  Keep this function as simple, small and fast as possible
-	 *  This function is as callback in the Rx thread.
-	 *  Do not use any blocking calls here
-	 * ----------------------------
-	 */
-	esp_err_t ret = ESP_FAIL;
-
-	/* Process custom data from req */
-	ESP_LOGI(TAG, "Received custom RPC request [%" PRIu32 "] with len: %u", req->custom_msg_id, req->data_len);
-	ESP_HEXLOGD("RPC_DATA_IN", req->data, req->data_len, 32);
-
-	/* Clear response data structure before use */
-	memset(resp_out, 0, sizeof(custom_rpc_unserialised_data_t));
-
-	resp_out->custom_msg_id = req->custom_msg_id; /* Right now Response ID is same as Request ID, you can customise it as needed */
-
-	switch (req->custom_msg_id) {
-
-		case CUSTOM_RPC_REQ_ID__ECHO_BACK_RESPONSE:
-			/* Example: Echo back the data */
-			if (req->data_len > 0) {
-				resp_out->data = malloc(req->data_len);
-				if (resp_out->data) {
-					memcpy(resp_out->data, req->data, req->data_len);
-					resp_out->data_len = req->data_len;
-					resp_out->free_func = free; /* Always set free function when allocating memory */
-					ESP_LOGI(TAG, "Echoing back %u bytes of data", req->data_len);
-					ret = ESP_OK;
-				} else {
-					ESP_LOGE(TAG, "Failed to allocate memory for response data");
-					ret = ESP_FAIL;
-				}
-			} else {
-				/* No data to echo back, still consider it a success */
-				ESP_LOGI(TAG, "No data to echo back");
-				ret = ESP_OK;
-			}
-			break;
-
-		case CUSTOM_RPC_REQ_ID__ECHO_BACK_AS_EVENT:
-			/* Process the request and trigger an event */
-			if (req->data_len > 0 && req->data) {
-				/* Map the request 'CUSTOM_RPC_REQ_ID__ECHO_BACK_AS_EVENT' to event 'CUSTOM_RPC_EVENT_ID__DEMO_ECHO_BACK_REQUEST' */
-				ret = create_and_send_custom_rpc_unserialised_event(CUSTOM_RPC_EVENT_ID__DEMO_ECHO_BACK_REQUEST, req->data, req->data_len);
-			} else {
-				ESP_LOGI(TAG, "No data to echo back as event");
-				ret = ESP_OK;
-			}
-			break;
-
-		case CUSTOM_RPC_REQ_ID__ONLY_ACK:
-			/* Just process the request, don't return any data */
-			ESP_LOGI(TAG, "Processing request with ID [%" PRIu32 "] - acknowledgement only", req->custom_msg_id);
-			ret = ESP_OK;
-			break;
-
-		default:
-			/* Handle unknown message IDs */
-			ESP_LOGW(TAG, "Unhandled custom RPC request ID [%" PRIu32 "], just acknowledging receipt", req->custom_msg_id);
-			ret = ESP_OK; /* Still return OK to acknowledge receipt */
-			break;
-	}
-
-	/* Debug output for response */
-	if (resp_out->data && resp_out->data_len > 0) {
-		ESP_HEXLOGD("RPC_DATA_OUT", resp_out->data, resp_out->data_len, 32);
-	}
-
-	return ret;
-}
-
-/* Create a helper function to allocate and fill event data structure */
-esp_err_t create_and_send_custom_rpc_unserialised_event(uint32_t custom_event_id, const void *data, size_t data_len) {
-	/* Calculate total size needed for the structure plus data */
-
-	custom_rpc_unserialised_data_t event_data = {0};
-	event_data.data_len = data && data_len > 0 ? data_len : 0;
-
-	ESP_LOGI(TAG, "Creating custom RPC event with ID [%" PRIu32 "], data: %p, data length: %u", custom_event_id, data, event_data.data_len);
-
-	if (event_data.data_len) {
-		/* Allocate memory for the entire structure */
-		event_data.data = (uint8_t *)malloc(event_data.data_len);
-		if (!event_data.data) {
-			ESP_LOGE(TAG, "Failed to allocate memory for custom RPC event");
-			return ESP_FAIL;
-		}
-		memcpy(event_data.data, data, event_data.data_len);
-	}
-
-	/* Fill in the data */
-	event_data.custom_msg_id = custom_event_id;
-	event_data.free_func = (event_data.data_len) ? free : NULL;
-
-
-	/* Send the event */
-	esp_err_t ret = send_custom_rpc_unserialised_event(&event_data);
-
-	return ret;
-}
