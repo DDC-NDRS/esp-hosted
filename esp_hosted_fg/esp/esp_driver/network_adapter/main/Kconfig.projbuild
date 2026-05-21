@@ -762,6 +762,15 @@ menu "Example Configuration"
 		help
 			Extra set of optional examples to run at slave
 
+	config ESP_HOSTED_COPROCESSOR_EXAMPLE_PEER_DATA
+		bool "Peer data transfer echo example"
+		default y
+		help
+			Registers a custom-RPC request handler on the slave that echoes
+			host CAT(1)/DOG(3)/HUMAN(5) payloads back as events with msg_id
+			MEOW(2)/WOOF(4)/HELLO(6). Paired with the host-side
+			peer_data_example shell command.
+
 	menu "Select Examples to run"
 		depends on ESP_HOSTED_EXTRA_EXAMPLES && NETWORK_SPLIT_ENABLED
 

@@ -560,8 +560,9 @@ static void process_rx_packet(struct sk_buff *skb)
 		}
 
 		if (serial_reasm[if_num].len + len > SERIAL_REASM_MAX_LEN) {
-			esp_err("serial reasm overflow: %zu + %zu > %u, dropping\n",
-					serial_reasm[if_num].len, len, SERIAL_REASM_MAX_LEN);
+			esp_err("serial reasm overflow: %zu + %zu > %zu, dropping\n",
+					serial_reasm[if_num].len, (size_t)len,
+					(size_t)SERIAL_REASM_MAX_LEN);
 			serial_reasm_reset(if_num);
 			dev_kfree_skb_any(skb);
 			return;
