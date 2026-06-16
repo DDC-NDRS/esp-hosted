@@ -580,6 +580,8 @@ static int ctrl_app_parse_resp(CtrlMsg *ctrl_msg, ctrl_cmd_t *app_resp)
 				ctrl_msg->resp_get_softap_config->bw;
 			app_resp->u.wifi_softap_config.band_mode =
 				ctrl_msg->resp_get_softap_config->band_mode;
+			app_resp->u.wifi_softap_config.protocol =
+				ctrl_msg->resp_get_softap_config->protocol;
 
 			break;
 		} case CTRL_RESP_SET_SOFTAP_VND_IE : {
@@ -1590,6 +1592,7 @@ int ctrl_app_send_req(ctrl_cmd_t *app_req)
 			req_payload->ssid_hidden = p->ssid_hidden;
 			req_payload->bw = p->bandwidth;
 			req_payload->band_mode = p->band_mode;
+			req_payload->protocol = p->protocol;
 			break;
 		} case CTRL_REQ_SET_PS_MODE: {
 			wifi_power_save_t * p = &app_req->u.wifi_ps;

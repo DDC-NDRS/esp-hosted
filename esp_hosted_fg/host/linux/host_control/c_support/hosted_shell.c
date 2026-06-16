@@ -293,7 +293,8 @@ static const cmd_arg_t start_softap_args[] = {
 	{"--hide_ssid", "Hide SSID broadcasting", ARG_TYPE_BOOL, false, NULL},
 	{"--bw", "Wi-Fi Bandwidth [20|40]", ARG_TYPE_INT, false, NULL},
 	{"--start_dhcp_server", "Start DHCP server", ARG_TYPE_BOOL, false, NULL},
-	{"--band_mode", "Band mode [2.4G, 5G, auto]", ARG_TYPE_CHOICE, false, wifi_band_mode_choices}
+	{"--band_mode", "Band mode [2.4G, 5G, auto]", ARG_TYPE_CHOICE, false, wifi_band_mode_choices},
+	{"--protocol", "PHY protocol; 40MHz needs 11n (11n@2.4G or 5G)", ARG_TYPE_CHOICE, false, wifi_protocol_choices}
 };
 
 static const cmd_arg_t set_wifi_power_save_args[] = {
@@ -806,6 +807,9 @@ static int handle_start_softap(int argc, char **argv) {
 	const char *band_mode = get_arg_value(argc, argv, start_softap_args,
 			sizeof(start_softap_args)/sizeof(cmd_arg_t),
 			"--band_mode");
+	const char *protocol = get_arg_value(argc, argv, start_softap_args,
+			sizeof(start_softap_args)/sizeof(cmd_arg_t),
+			"--protocol");
 
 	/* Use default values from ctrl_config.h if arguments are not provided */
 	if (!ssid) {
@@ -822,7 +826,12 @@ static int handle_start_softap(int argc, char **argv) {
 	const char *encryption_mode = sec_prot ? sec_prot : "wpa2_psk"; // Default to WPA2
 	int max_conn_value = max_conn ? atoi(max_conn) : SOFTAP_MODE_MAX_ALLOWED_CLIENTS;
 	bool hide_ssid_value = hide_ssid ? is_arg_true(hide_ssid) : SOFTAP_MODE_SSID_HIDDEN;
-	int bw_value = bw ? atoi(bw) : SOFTAP_MODE_BANDWIDTH;
+	/* Accept MHz (20/40) like the station path; also accept raw enum 1/2. */
+	int bw_value = SOFTAP_MODE_BANDWIDTH;
+	if (bw) {
+		int m = atoi(bw);
+		bw_value = (m == 40) ? H_WIFI_BW_HT40 : (m == 20) ? H_WIFI_BW_HT20 : m;
+	}
 
 	int band_mode_value = SOFTAP_BAND_MODE;
 	if (band_mode) {
@@ -835,6 +844,27 @@ static int handle_start_softap(int argc, char **argv) {
 		}
 	}
 
+	/* PHY protocol: band-agnostic token -> bitmap (mirrors station + Python).
+	 * 11ac is 5G-only, lr is 2.4G-only. */
+	int sap_is_5g = (band_mode_value == WIFI_BAND_MODE_5G);
+	int protocol_value = SOFTAP_MODE_PROTOCOL;
+	if (protocol && strcmp(protocol, "auto") != 0) {
+		if (strcmp(protocol, "legacy") == 0)     protocol_value = sap_is_5g ? H_PHY_5G_LEGACY : H_PHY_2G_LEGACY;
+		else if (strcmp(protocol, "11n") == 0)   protocol_value = sap_is_5g ? H_PHY_5G_11N : H_PHY_2G_11N;
+		else if (strcmp(protocol, "11ac") == 0)  protocol_value = sap_is_5g ? H_PHY_5G_11AC : -1;
+		else if (strcmp(protocol, "11ax") == 0)  protocol_value = sap_is_5g ? H_PHY_5G_11AX : H_PHY_2G_11AX;
+		else if (strcmp(protocol, "lr") == 0)    protocol_value = sap_is_5g ? -1 : H_PHY_2G_LR;
+		if (protocol_value < 0) {
+			printf("protocol '%s' is not valid on this band\n", protocol);
+			return FAILURE;
+		}
+	}
+	/* HT40 (bw=2) exists only in 11n: auto-select band 11n when protocol unset;
+	 * an explicit 11ax/ac is left to the slave to reject. */
+	if (bw_value == H_WIFI_BW_HT40 && protocol_value == 0) {
+		protocol_value = sap_is_5g ? H_PHY_5G_11N : H_PHY_2G_11N;
+	}
+
 	return test_softap_mode_start_with_params(
 			ssid,
 			password,
@@ -843,7 +873,8 @@ static int handle_start_softap(int argc, char **argv) {
 			max_conn_value,
 			hide_ssid_value,
 			bw_value,
-			band_mode_value
+			band_mode_value,
+			protocol_value
 			);
 }
 

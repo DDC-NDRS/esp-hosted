@@ -245,7 +245,7 @@ def process_softap_vendor_ie(enable, data):
 	return ""
 
 
-def process_start_softap(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, start_dhcp_server, band_mode):
+def process_start_softap(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, start_dhcp_server, band_mode, protocol=""):
 	if sec_prot != "open" and pwd == "":
 		return "password mandatory for security protocol"
 
@@ -273,7 +273,21 @@ def process_start_softap(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, 
 	if band_mode < WIFI_BAND_MODE_2G_ONLY or band_mode > WIFI_BAND_MODE_AUTO:
 		return "Invalid band_mode parameter " + str(band_mode) + ": value should be from " + str(WIFI_BAND_MODE_2G_ONLY) + " to " + str(WIFI_BAND_MODE_AUTO)
 
-	if test_sync_softap_mode_start(ssid, pwd, channel, encr, max_conn, hide_ssid, bw_l, band_mode) != SUCCESS:
+	# protocol: band-agnostic token -> bitmap; HT40 needs 11n (auto-derive when unset),
+	# same rule as station (esp_wifi: 40 MHz only under 11n, not 11ax/ac).
+	proto_l, err = _resolve_protocol(protocol, band_mode)
+	if err:
+		return err
+	if bw_l == WIFI_BW.WIFI_BW_HT40.value:
+		if band_mode not in (WIFI_BAND_MODE_2G_ONLY, WIFI_BAND_MODE_5G_ONLY):
+			return "bw=40 (HT40) needs a specific band_mode (2.4G or 5G)"
+		if proto_l == 0:
+			proto_l = H_PHY_5G_11N if band_mode == WIFI_BAND_MODE_5G_ONLY else H_PHY_2G_11N
+		elif (proto_l & (H_WIFI_PROTOCOL_11AX | H_WIFI_PROTOCOL_11AC)) or not (proto_l & H_WIFI_PROTOCOL_11N):
+			return "bw=40 (HT40) needs 11n; protocol '" + str(protocol) + \
+				"' enables 11ax/ac. Use --protocol 11n or omit it (auto-selects 11n)"
+
+	if test_sync_softap_mode_start(ssid, pwd, channel, encr, max_conn, hide_ssid, bw_l, band_mode, proto_l) != SUCCESS:
 		ret_str = "Failed to start ESP softap"
 		return ret_str
 	print("\n")

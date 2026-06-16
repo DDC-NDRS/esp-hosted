@@ -333,6 +333,7 @@ typedef struct {
 	wifi_bandwidth_e bandwidth;
 	char out_mac[MAX_MAC_STR_SIZE];
 	int band_mode;
+	int protocol;
 } softap_config_t;
 
 typedef struct {

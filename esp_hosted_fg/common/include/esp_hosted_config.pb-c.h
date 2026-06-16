@@ -462,10 +462,11 @@ struct  CtrlMsgRespGetSoftAPConfig
   int32_t bw;
   int32_t resp;
   int32_t band_mode;
+  int32_t protocol;
 };
 #define CTRL_MSG__RESP__GET_SOFT_APCONFIG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ctrl_msg__resp__get_soft_apconfig__descriptor) \
-, {0,NULL}, {0,NULL}, 0, CTRL__WIFI_SEC_PROT__Open, 0, 0, 0, 0, 0 }
+, {0,NULL}, {0,NULL}, 0, CTRL__WIFI_SEC_PROT__Open, 0, 0, 0, 0, 0, 0 }
 
 
 struct  CtrlMsgReqStartSoftAP
@@ -479,10 +480,11 @@ struct  CtrlMsgReqStartSoftAP
   protobuf_c_boolean ssid_hidden;
   int32_t bw;
   int32_t band_mode;
+  int32_t protocol;
 };
 #define CTRL_MSG__REQ__START_SOFT_AP__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ctrl_msg__req__start_soft_ap__descriptor) \
-, (char *)protobuf_c_empty_string, (char *)protobuf_c_empty_string, 0, CTRL__WIFI_SEC_PROT__Open, 0, 0, 0, 0 }
+, (char *)protobuf_c_empty_string, (char *)protobuf_c_empty_string, 0, CTRL__WIFI_SEC_PROT__Open, 0, 0, 0, 0, 0 }
 
 
 struct  CtrlMsgRespStartSoftAP

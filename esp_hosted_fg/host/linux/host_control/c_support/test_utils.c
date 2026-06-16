@@ -658,6 +658,7 @@ int ctrl_app_resp_callback(ctrl_cmd_t * app_resp)
 			printf("softAP ssid broadcast status %d \n", resp_p->ssid_hidden);
 			printf("softAP bandwidth mode %d \n", resp_p->bandwidth);
 			printf("softAP band mode %d \n", resp_p->band_mode);
+			printf("softAP PHY protocol bitmap 0x%x (0x4=11n 0x40=11ax 0x20=11ac)\n", resp_p->protocol);
 
 			break;
 		} case CTRL_RESP_SET_SOFTAP_VND_IE : {
@@ -1057,6 +1058,7 @@ int test_softap_mode_start(void)
 	req->u.wifi_softap_config.ssid_hidden = SOFTAP_MODE_SSID_HIDDEN;
 	req->u.wifi_softap_config.bandwidth = SOFTAP_MODE_BANDWIDTH;
 	req->u.wifi_softap_config.band_mode = SOFTAP_BAND_MODE;
+	req->u.wifi_softap_config.protocol = SOFTAP_MODE_PROTOCOL;
 
 	resp = wifi_start_softap(req);
 
@@ -1832,7 +1834,7 @@ int test_station_mode_disconnect_with_params(bool reset_dhcp)
 /* Updated softap start function with parameters */
 int test_softap_mode_start_with_params(const char *ssid, const char *pwd, int channel,
 		const char *sec_prot, int max_conn, bool hide_ssid,
-		int bw, int band_mode)
+		int bw, int band_mode, int protocol)
 {
 	/* implemented synchronous */
 	ctrl_cmd_t *req = CTRL_CMD_DEFAULT_REQ();
@@ -1867,6 +1869,7 @@ int test_softap_mode_start_with_params(const char *ssid, const char *pwd, int ch
 	req->u.wifi_softap_config.ssid_hidden = hide_ssid ? 1 : SOFTAP_MODE_SSID_HIDDEN;
 	req->u.wifi_softap_config.bandwidth = bw ? bw : SOFTAP_MODE_BANDWIDTH;
 	req->u.wifi_softap_config.band_mode = band_mode ? band_mode : SOFTAP_BAND_MODE;
+	req->u.wifi_softap_config.protocol = protocol;
 
 	resp = wifi_start_softap(req);
 	CLEANUP_CTRL_MSG(req);

@@ -279,6 +279,7 @@ message CtrlMsg_Resp_GetSoftAPConfig {
 	int32 bw = 7;
 	int32 resp = 8;
 	int32 band_mode = 9;
+	int32 protocol = 10;
 }
 
 message CtrlMsg_Req_StartSoftAP {
@@ -290,6 +291,7 @@ message CtrlMsg_Req_StartSoftAP {
 	bool ssid_hidden = 6;
 	int32 bw = 7;
 	int32 band_mode = 8;
+	int32 protocol = 9;
 }
 
 message CtrlMsg_Resp_StartSoftAP {

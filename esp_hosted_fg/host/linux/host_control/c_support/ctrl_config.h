@@ -106,6 +106,9 @@
 #define SOFTAP_MODE_SSID_HIDDEN             false
 #define SOFTAP_MODE_BANDWIDTH               2
 #define SOFTAP_BAND_MODE                    BAND_MODE_AUTO
+/* PHY protocol bitmap (WIFI_PROTOCOL_*): 0 = firmware default. 40MHz needs 11n
+ * (0x07 = 11bgn on 2.4G, 0x14 = 11an on 5G) */
+#define SOFTAP_MODE_PROTOCOL                0
 
 /* COUNTRY_CODE is expected to be three octets. */
 /* From documentation for esp_wifi_set_country_code():

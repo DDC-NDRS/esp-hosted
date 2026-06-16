@@ -238,7 +238,8 @@ class SOFTAP_CONFIG(Structure):
 			("ssid_hidden", c_bool),
 			("bandwidth", c_uint),
 			("out_mac", c_char * MAX_MAC_STR_LEN),
-			("band_mode", c_int)]
+			("band_mode", c_int),
+			("protocol", c_int)]
 
 
 class CONTROL_CONFIG(Union):

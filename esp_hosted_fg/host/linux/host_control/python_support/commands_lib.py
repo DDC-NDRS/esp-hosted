@@ -502,8 +502,9 @@ def ctrl_app_resp_callback(app_resp):
 		print("softAP auth mode \""+str(softap_config_p.contents.encryption_mode)+"\"")
 		print("softAP max connections \""+str(softap_config_p.contents.max_connections)+"\"")
 		print("softAP hide ssid \""+str(softap_config_p.contents.ssid_hidden)+"\"")
-		print("softAP bandwidth \""+str(softap_config_p.contents.bandwidth)+"\"")
+		print("softAP bandwidth \""+str(softap_config_p.contents.bandwidth)+"\" (1=HT20, 2=HT40)")
 		print("softAP band mode \""+str(softap_config_p.contents.band_mode)+"\"")
+		print("softAP PHY protocol bitmap \""+hex(softap_config_p.contents.protocol)+"\" (0x4=11n 0x40=11ax 0x20=11ac)")
 
 	elif (app_resp.contents.msg_id == CTRL_MSGID.CTRL_RESP_GET_SOFTAP_CONN_STA_LIST.value) :
 		count = app_resp.contents.control_data.wifi_connected_stations_list.count
@@ -1112,7 +1113,7 @@ def test_sync_station_mode_disconnect():
 
 
 
-def test_sync_softap_mode_start(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, band_mode):
+def test_sync_softap_mode_start(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, band_mode, protocol=0):
 	req = CTRL_CMD_DEFAULT_REQ()
 	if not req:
 		print("Failed to allocate memory for request")
@@ -1125,6 +1126,7 @@ def test_sync_softap_mode_start(ssid, pwd, channel, sec_prot, max_conn, hide_ssi
 	req.contents.control_data.wifi_softap_config.ssid_hidden = hide_ssid
 	req.contents.control_data.wifi_softap_config.bandwidth = bw
 	req.contents.control_data.wifi_softap_config.band_mode = band_mode
+	req.contents.control_data.wifi_softap_config.protocol = protocol
 	resp = POINTER(CONTROL_COMMAND)
 	resp = None
 	resp = commands_map_py_to_c.wifi_start_softap(req)

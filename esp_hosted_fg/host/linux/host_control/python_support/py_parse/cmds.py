@@ -175,7 +175,7 @@ class ctrl_cmd(object):
 		return self
 
 
-	def start_softap(self, ssid : str = "", pwd : str = "", channel : int = 1, sec_prot: str = "wpa_wpa2_psk", max_conn: int = 4, hide_ssid: bool = False, bw : int = 20, start_dhcp_server : bool = True, band_mode: int = WIFI_BAND_MODE_AUTO):
+	def start_softap(self, ssid : str = "", pwd : str = "", channel : int = 1, sec_prot: str = "wpa_wpa2_psk", max_conn: int = 4, hide_ssid: bool = False, bw : int = 20, start_dhcp_server : bool = True, band_mode: int = WIFI_BAND_MODE_AUTO, protocol : str = ""):
 		"""Connect to AP (Wi-Fi router or hotspot)
 
 		Args:
@@ -188,6 +188,7 @@ class ctrl_cmd(object):
 			bw(int, optional): O | Wi-Fi Bandwidth [ 20 | 40 ] | Default: 20
 			start_dhcp_server(bool, optional): O | Start DHCP server | Default: True
 			band_mode(int, optional): O | Connect on 2.4G (1) or 5G (2) band, or Auto select (3) | Default:3
+			protocol(str, optional): O | PHY protocol: auto/legacy/11n/11ac/11ax/lr (band-resolved). 40MHz needs 11n; '' = auto | Default:''
 
 		Returns:
 			ctrl_cmd: ctrl_cmd object
@@ -200,7 +201,7 @@ class ctrl_cmd(object):
 			self.out = "Missing param " + "--pwd"
 			return self
 
-		self.out = process_start_softap(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, start_dhcp_server, band_mode)
+		self.out = process_start_softap(ssid, pwd, channel, sec_prot, max_conn, hide_ssid, bw, start_dhcp_server, band_mode, protocol)
 		return self
 
 

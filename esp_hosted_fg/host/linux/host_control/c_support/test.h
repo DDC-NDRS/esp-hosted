@@ -92,7 +92,7 @@ int test_station_mode_connect_with_params(const char *ssid, const char *pwd, con
 int test_station_mode_disconnect_with_params(bool reset_dhcp);
 int test_softap_mode_start_with_params(const char *ssid, const char *pwd, int channel,
 		const char *sec_prot, int max_conn, bool hide_ssid,
-		int bw, int band_mode);
+		int bw, int band_mode, int protocol);
 int test_wifi_set_power_save_mode_with_params(int psmode);
 int test_get_fw_version_with_params(char *version, uint16_t version_size);
 int test_ota_update_with_params(const char *url);

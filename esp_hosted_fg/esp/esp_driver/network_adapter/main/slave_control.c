@@ -1422,8 +1422,15 @@ static esp_err_t req_get_softap_config_handler (CtrlMsg *req,
 		band_mode = WIFI_BAND_MODE_AUTO;
 	}
 	resp_payload->band_mode = band_mode;
+	wifi_protocols_t protocols = { 0 };
+	if (esp_wifi_get_protocols(WIFI_IF_AP, &protocols) == ESP_OK)
+		resp_payload->protocol = (credentials.chnl > 14) ?
+			protocols.ghz_5g : protocols.ghz_2g;
 #else
 	resp_payload->bw = get_bw;
+	uint8_t get_proto = 0;
+	if (esp_wifi_get_protocol(WIFI_IF_AP, &get_proto) == ESP_OK)
+		resp_payload->protocol = get_proto;
 #endif
 
 	resp_payload->resp = SUCCESS;
@@ -1431,6 +1438,79 @@ static esp_err_t req_get_softap_config_handler (CtrlMsg *req,
 
 err:
 	resp_payload->resp = FAILURE;
+	return ESP_OK;
+}
+
+/* Apply protocol + bandwidth to the SoftAP (band_mode already set by the caller).
+ * HT40 exists only in 11n on this silicon, so bw=40 auto-derives band-11n; an
+ * explicit 11ax/ac with bw=40, or protocol/HT40 under AUTO band, is rejected.
+ * Protocol is applied before bandwidth. Returns ESP_OK or an error. */
+static esp_err_t apply_softap_protocol_bw(int protocol, int bw)
+{
+	esp_err_t ret;
+#if WIFI_DUALBAND_SUPPORT
+	wifi_band_mode_t band_mode = WIFI_BAND_MODE_AUTO;
+	wifi_bandwidths_t bandwidths = { 0 };
+	bool band_specific;
+
+	esp_wifi_get_band_mode(&band_mode);
+	band_specific = (band_mode == WIFI_BAND_MODE_2G_ONLY ||
+			band_mode == WIFI_BAND_MODE_5G_ONLY);
+
+	if (protocol && !band_specific) {
+		ESP_LOGE(TAG, "SoftAP protocol needs a specific band_mode (2.4G or 5G)");
+		return ESP_ERR_INVALID_ARG;
+	}
+	if (bw == H_WIFI_BW_HT40) {
+		if (!band_specific) {
+			ESP_LOGE(TAG, "SoftAP bw=40 needs a specific band_mode (2.4G or 5G)");
+			return ESP_ERR_INVALID_ARG;
+		}
+		if (protocol == 0) {
+			protocol = (band_mode == WIFI_BAND_MODE_2G_ONLY) ? H_PHY_2G_11N : H_PHY_5G_11N;
+		} else if ((protocol & (H_WIFI_PROTOCOL_11AX | H_WIFI_PROTOCOL_11AC)) ||
+				!(protocol & H_WIFI_PROTOCOL_11N)) {
+			ESP_LOGE(TAG, "SoftAP HT40 needs 11n without 11ax/ac");
+			return ESP_ERR_INVALID_ARG;
+		}
+	}
+	if (protocol) {
+		wifi_protocols_t protocols = { 0 };
+		if (band_mode == WIFI_BAND_MODE_2G_ONLY)
+			protocols.ghz_2g = protocol;
+		else
+			protocols.ghz_5g = protocol;
+		ret = esp_wifi_set_protocols(WIFI_IF_AP, &protocols);
+		if (ret) {
+			ESP_LOGE(TAG, "Failed to set SoftAP protocol 0x%x [0x%x]", protocol, ret);
+			return ret;
+		}
+		ESP_LOGI(TAG, "Set SoftAP protocol to 0x%x", protocol);
+	}
+
+	switch (band_mode) {
+	case WIFI_BAND_MODE_2G_ONLY: bandwidths.ghz_2g = bw; break;
+	case WIFI_BAND_MODE_5G_ONLY: bandwidths.ghz_5g = bw; break;
+	default: bandwidths.ghz_2g = bw; bandwidths.ghz_5g = bw; break;
+	}
+	ret = esp_wifi_set_bandwidths(WIFI_IF_AP, &bandwidths);
+#else
+	/* Single-band (2.4G): bw=40 needs 11n; auto-derive when unset. */
+	if (bw == H_WIFI_BW_HT40 && protocol == 0)
+		protocol = H_PHY_2G_11N;
+	if (protocol) {
+		ret = esp_wifi_set_protocol(WIFI_IF_AP, protocol);
+		if (ret) {
+			ESP_LOGE(TAG, "Failed to set SoftAP protocol 0x%x [0x%x]", protocol, ret);
+			return ret;
+		}
+	}
+	ret = esp_wifi_set_bandwidth(WIFI_IF_AP, bw);
+#endif
+	if (ret) {
+		ESP_LOGE(TAG, "Failed to set SoftAP bandwidth");
+		return ret;
+	}
 	return ESP_OK;
 }
 
@@ -1444,7 +1524,6 @@ static esp_err_t req_start_softap_handler (CtrlMsg *req,
 	wifi_config_t *wifi_config = NULL;
 	CtrlMsgRespStartSoftAP *resp_payload = NULL;
 #if WIFI_DUALBAND_SUPPORT
-	wifi_bandwidths_t bandwidths = { 0 };
 	wifi_band_mode_t band_mode = 0; // 0 is currently an invalid value
 #endif
 
@@ -1546,33 +1625,12 @@ static esp_err_t req_start_softap_handler (CtrlMsg *req,
 		goto err;
 	}
 
-	// set bandwidth, based on band mode
-	switch (band_mode) {
-	case WIFI_BAND_MODE_2G_ONLY:
-		bandwidths.ghz_2g = req->req_start_softap->bw;
-		break;
-	case WIFI_BAND_MODE_5G_ONLY:
-		bandwidths.ghz_5g = req->req_start_softap->bw;
-		break;
-	// auto and default have the same settings
-	case WIFI_BAND_MODE_AUTO:
-	default:
-		bandwidths.ghz_2g = req->req_start_softap->bw;
-		bandwidths.ghz_5g = req->req_start_softap->bw;
-		break;
-	}
-	ret = esp_wifi_set_bandwidths(WIFI_IF_AP, &bandwidths);
-	if (ret) {
-		ESP_LOGE(TAG,"Failed to set bandwidth");
-		goto err;
-	}
-#else
-	ret = esp_wifi_set_bandwidth(WIFI_IF_AP,req->req_start_softap->bw);
-	if (ret) {
-		ESP_LOGE(TAG,"Failed to set bandwidth");
-		goto err;
-	}
 #endif
+	/* Apply requested protocol + bandwidth (auto-derives 11n for bw=40). */
+	ret = apply_softap_protocol_bw(req->req_start_softap->protocol,
+			req->req_start_softap->bw);
+	if (ret)
+		goto err;
 
 	ESP_LOGI(TAG, MACSTR, MAC2STR(mac));
 
