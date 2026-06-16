@@ -319,6 +319,8 @@ typedef struct {
 	char status[STATUS_LENGTH];
 	char out_mac[MAX_MAC_STR_SIZE];
 	int band_mode;
+	int bandwidth;
+	int protocol;
 } wifi_ap_config_t;
 
 typedef struct {

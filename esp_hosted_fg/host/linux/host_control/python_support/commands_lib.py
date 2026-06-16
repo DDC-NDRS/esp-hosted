@@ -464,6 +464,8 @@ def ctrl_app_resp_callback(app_resp):
 			print("AP's rssi \""+str(ap_config_p.contents.rssi)+"\"")
 			print("AP's encryption mode \""+str(ap_config_p.contents.encryption_mode)+"\"")
 			print("AP's band mode \""+str(ap_config_p.contents.band_mode)+"\"")
+			print("STA link bandwidth \""+str(ap_config_p.contents.bandwidth)+"\" (1=HT20, 2=HT40, 0=unset)")
+			print("STA PHY protocol bitmap \""+hex(ap_config_p.contents.protocol)+"\" (0x4=11n 0x40=11ax 0x20=11ac)")
 		else:
 			print("Station mode status: "+get_str(ap_config_p.contents.status))
 
@@ -1036,7 +1038,7 @@ def test_sync_get_available_wifi():
 
 
 
-def test_async_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band_mode):
+def test_async_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band_mode,bandwidth=0,protocol=0):
 	req = CTRL_CMD_DEFAULT_REQ()
 	if not req:
 		print("Failed to allocate memory for request")
@@ -1048,6 +1050,8 @@ def test_async_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band
 	req.contents.control_data.wifi_ap_config.is_wpa3_supported = use_wpa3
 	req.contents.control_data.wifi_ap_config.listen_interval = listen_interval
 	req.contents.control_data.wifi_ap_config.band_mode = band_mode
+	req.contents.control_data.wifi_ap_config.bandwidth = bandwidth
+	req.contents.control_data.wifi_ap_config.protocol = protocol
 	req.contents.ctrl_resp_cb = ctrl_app_resp_cb
 
 	commands_map_py_to_c.wifi_connect_ap(req)
@@ -1057,7 +1061,7 @@ def test_async_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band
 
 
 
-def test_sync_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band_mode):
+def test_sync_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band_mode,bandwidth=0,protocol=0):
 	req = CTRL_CMD_DEFAULT_REQ()
 	if not req:
 		print("Failed to allocate memory for request")
@@ -1068,6 +1072,8 @@ def test_sync_station_mode_connect(ssid,pwd,bssid,use_wpa3,listen_interval,band_
 	req.contents.control_data.wifi_ap_config.is_wpa3_supported = use_wpa3
 	req.contents.control_data.wifi_ap_config.listen_interval = listen_interval
 	req.contents.control_data.wifi_ap_config.band_mode = band_mode
+	req.contents.control_data.wifi_ap_config.bandwidth = bandwidth
+	req.contents.control_data.wifi_ap_config.protocol = protocol
 
 	resp = POINTER(CONTROL_COMMAND)
 	resp = None

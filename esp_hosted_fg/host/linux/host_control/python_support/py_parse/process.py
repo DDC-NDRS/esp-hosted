@@ -129,13 +129,88 @@ def process_get_available_wifi():
 	return ""
 
 
-def process_connect_ap(ssid, pwd, bssid, use_wpa3, listen_interval, band_mode):
+# Mirror of common/include/esp_hosted_wifi_phy.h (keep in sync). Named constants
+# instead of magic numbers; bit values match esp_wifi WIFI_PROTOCOL_*.
+H_WIFI_PROTOCOL_11B  = 0x01
+H_WIFI_PROTOCOL_11G  = 0x02
+H_WIFI_PROTOCOL_11N  = 0x04
+H_WIFI_PROTOCOL_LR   = 0x08
+H_WIFI_PROTOCOL_11A  = 0x10
+H_WIFI_PROTOCOL_11AC = 0x20
+H_WIFI_PROTOCOL_11AX = 0x40
+
+H_PHY_2G_LEGACY = H_WIFI_PROTOCOL_11B | H_WIFI_PROTOCOL_11G
+H_PHY_2G_11N    = H_PHY_2G_LEGACY | H_WIFI_PROTOCOL_11N
+H_PHY_2G_11AX   = H_PHY_2G_11N | H_WIFI_PROTOCOL_11AX
+H_PHY_2G_LR     = H_WIFI_PROTOCOL_LR
+H_PHY_5G_LEGACY = H_WIFI_PROTOCOL_11A
+H_PHY_5G_11N    = H_PHY_5G_LEGACY | H_WIFI_PROTOCOL_11N
+H_PHY_5G_11AC   = H_PHY_5G_11N | H_WIFI_PROTOCOL_11AC
+H_PHY_5G_11AX   = H_PHY_5G_11AC | H_WIFI_PROTOCOL_11AX
+
+# Band-agnostic PHY protocol tokens -> (2.4G bitmap, 5G bitmap).
+# None = token not valid on that band. The user thinks in PHY generation; we resolve
+# to the band-correct bitmap using band_mode. The slave validates authoritatively.
+PROTOCOL_TABLE = {
+	# token   : (2.4G,            5G)
+	"legacy":   (H_PHY_2G_LEGACY, H_PHY_5G_LEGACY),
+	"11n":      (H_PHY_2G_11N,    H_PHY_5G_11N),    # needed for HT40
+	"11ac":     (None,            H_PHY_5G_11AC),   # 5G only
+	"11ax":     (H_PHY_2G_11AX,   H_PHY_5G_11AX),   # chip default
+	"lr":       (H_PHY_2G_LR,     None),            # 2.4G only
+}
+
+def _resolve_protocol(token, band_mode):
+	"""Return (bitmap, error_str). bitmap 0 = unset/auto."""
+	t = str(token).strip().lower()
+	if t in ("", "auto"):
+		return 0, None
+	if t not in PROTOCOL_TABLE:
+		return 0, "Unsupported protocol '" + str(token) + "' (use auto/legacy/11n/11ac/11ax/lr)"
+	if band_mode == WIFI_BAND_MODE_2G_ONLY:
+		bmp = PROTOCOL_TABLE[t][0]
+	elif band_mode == WIFI_BAND_MODE_5G_ONLY:
+		bmp = PROTOCOL_TABLE[t][1]
+	else:
+		return 0, "protocol '" + t + "' needs a specific band_mode (2.4G or 5G), not auto"
+	if bmp is None:
+		return 0, "protocol '" + t + "' is not valid on this band"
+	return bmp, None
+
+def process_connect_ap(ssid, pwd, bssid, use_wpa3, listen_interval, band_mode, bw=0, protocol=""):
 	ret_str = ""
 
 	if band_mode < WIFI_BAND_MODE_2G_ONLY or band_mode > WIFI_BAND_MODE_AUTO:
 		return "Invalid band_mode parameter " + get_str(band_mode)
 
-	if test_sync_station_mode_connect(ssid, pwd, bssid, use_wpa3, listen_interval, band_mode) != SUCCESS:
+	# bw: 0 => unset (let firmware/IDF negotiate default), else 20/40 MHz
+	if bw == 0:
+		bw_l = 0
+	elif bw == 20:
+		bw_l = WIFI_BW.WIFI_BW_HT20.value
+	elif bw == 40:
+		bw_l = WIFI_BW.WIFI_BW_HT40.value
+	else:
+		return "Unsupported bandwidth " + get_str(bw)
+
+	# protocol: band-agnostic token -> bitmap (0 = unset/firmware default)
+	proto_l, err = _resolve_protocol(protocol, band_mode)
+	if err:
+		return err
+
+	# HT40 exists only in 11n on this silicon. Make the common case frictionless:
+	# bw=40 with no explicit protocol auto-derives band-appropriate 11n. Only an
+	# explicit 11ax/11ac request alongside bw=40 is a real conflict -> reject.
+	if bw_l == WIFI_BW.WIFI_BW_HT40.value:
+		if band_mode not in (WIFI_BAND_MODE_2G_ONLY, WIFI_BAND_MODE_5G_ONLY):
+			return "bw=40 (HT40) needs a specific band_mode (2.4G or 5G)"
+		if proto_l == 0:
+			proto_l = H_PHY_5G_11N if band_mode == WIFI_BAND_MODE_5G_ONLY else H_PHY_2G_11N
+		elif (proto_l & (H_WIFI_PROTOCOL_11AX | H_WIFI_PROTOCOL_11AC)) or not (proto_l & H_WIFI_PROTOCOL_11N):
+			return "bw=40 (HT40) needs 11n; protocol '" + str(protocol) + \
+				"' enables 11ax/ac. Use --protocol 11n or omit it (auto-selects 11n)"
+
+	if test_sync_station_mode_connect(ssid, pwd, bssid, use_wpa3, listen_interval, band_mode, bw_l, proto_l) != SUCCESS:
 		ret_str = "Failed to submit connect AP request"
 		return ret_str
 

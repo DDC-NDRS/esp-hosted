@@ -7,6 +7,7 @@
 
 #include "hosted_shell.h"
 #include "test.h"
+#include "esp_hosted_wifi_phy.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -249,6 +250,7 @@ static const char *wifi_mode_choices[] = {"station", "softap", "station+softap",
 static const char *wifi_powersave_choices[] = {"none", "min", "max", NULL};
 static const char *wifi_interface_choices[] = {"station", "softap", NULL};
 static const char *wifi_band_mode_choices[] = {"2.4G", "5G", "auto", NULL};
+static const char *wifi_protocol_choices[] = {"auto", "legacy", "11n", "11ac", "11ax", "lr", NULL};
 static const char *wifi_sec_prot_choices[] = {"open", "wpa_psk", "wpa2_psk", "wpa_wpa2_psk", NULL};
 
 /* Define command arguments */
@@ -268,7 +270,9 @@ static const cmd_arg_t connect_ap_args[] = {
 	{"--use_wpa3", "Use WPA3 security protocol", ARG_TYPE_BOOL, false, NULL},
 	{"--listen_interval", "Number of AP beacons station will sleep", ARG_TYPE_INT, false, NULL},
 	{"--run_dhcp_client", "Request DHCP", ARG_TYPE_BOOL, false, NULL},
-	{"--band_mode", "Connect on 2.4G or 5G band", ARG_TYPE_CHOICE, false, wifi_band_mode_choices}
+	{"--band_mode", "Connect on 2.4G or 5G band", ARG_TYPE_CHOICE, false, wifi_band_mode_choices},
+	{"--bw", "PHY bandwidth in MHz [20|40] (omit = firmware default)", ARG_TYPE_INT, false, NULL},
+	{"--protocol", "PHY protocol; 40MHz needs 11n (11bgn@2.4G, 11an@5G)", ARG_TYPE_CHOICE, false, wifi_protocol_choices}
 };
 
 static const cmd_arg_t disconnect_ap_args[] = {
@@ -637,6 +641,12 @@ static int handle_connect(int argc, char **argv) {
 	const char *band_mode = get_arg_value(argc, argv, connect_ap_args,
 			sizeof(connect_ap_args)/sizeof(cmd_arg_t),
 			"--band_mode");
+	const char *bw = get_arg_value(argc, argv, connect_ap_args,
+			sizeof(connect_ap_args)/sizeof(cmd_arg_t),
+			"--bw");
+	const char *protocol = get_arg_value(argc, argv, connect_ap_args,
+			sizeof(connect_ap_args)/sizeof(cmd_arg_t),
+			"--protocol");
 
 	/* Use default values from ctrl_config.h if arguments are not provided */
 	if (!ssid || strlen(ssid)==0) {
@@ -667,6 +677,53 @@ static int handle_connect(int argc, char **argv) {
 		}
 	}
 
+	/* PHY bandwidth in MHz (20/40); also accept raw enum 1/2. 0/omit = auto. */
+	int bandwidth_value = STATION_MODE_BANDWIDTH;
+	if (bw) {
+		int m = atoi(bw);
+		bandwidth_value = (m == 40) ? H_WIFI_BW_HT40 : (m == 20) ? H_WIFI_BW_HT20 : m;
+	}
+
+	/* PHY protocol: band-agnostic token -> H_WIFI_PROTOCOL_* bitmap, resolved using
+	 * the chosen band (0 = unset/firmware default). Mirrors the Python control app
+	 * (py_parse/process.py). 11ac is 5G-only, lr is 2.4G-only. */
+	int is_5g = (band_mode_value == WIFI_BAND_MODE_5G);
+	int band_specific = (band_mode_value == WIFI_BAND_MODE_24G ||
+			band_mode_value == WIFI_BAND_MODE_5G);
+	int protocol_value = STATION_MODE_PROTOCOL;
+	if (protocol && strcmp(protocol, "auto") != 0) {
+		if (!band_specific) {
+			printf("protocol needs a specific band_mode (2.4G or 5G), not auto\n");
+			return FAILURE;
+		}
+		if (strcmp(protocol, "legacy") == 0)     protocol_value = is_5g ? H_PHY_5G_LEGACY : H_PHY_2G_LEGACY;
+		else if (strcmp(protocol, "11n") == 0)   protocol_value = is_5g ? H_PHY_5G_11N : H_PHY_2G_11N;
+		else if (strcmp(protocol, "11ac") == 0)  protocol_value = is_5g ? H_PHY_5G_11AC : -1; /* 5G only */
+		else if (strcmp(protocol, "11ax") == 0)  protocol_value = is_5g ? H_PHY_5G_11AX : H_PHY_2G_11AX;
+		else if (strcmp(protocol, "lr") == 0)    protocol_value = is_5g ? -1 : H_PHY_2G_LR; /* 2.4G only */
+		if (protocol_value < 0) {
+			printf("protocol '%s' is not valid on this band\n", protocol);
+			return FAILURE;
+		}
+	}
+
+	/* HT40 exists only in 11n: bw=40 with no protocol auto-selects band 11n; an
+	 * explicit 11ax/ac alongside bw=40 is a real contradiction -> reject early. */
+	if (bandwidth_value == H_WIFI_BW_HT40) {
+		if (!band_specific) {
+			printf("bw=40 (HT40) needs a specific band_mode (2.4G or 5G)\n");
+			return FAILURE;
+		}
+		if (protocol_value == 0) {
+			protocol_value = is_5g ? H_PHY_5G_11N : H_PHY_2G_11N;
+		} else if ((protocol_value & (H_WIFI_PROTOCOL_11AX | H_WIFI_PROTOCOL_11AC)) ||
+				!(protocol_value & H_WIFI_PROTOCOL_11N)) {
+			printf("bw=40 (HT40) needs 11n; protocol '%s' enables 11ax/ac. "
+					"Use --protocol 11n or omit it (auto-selects 11n)\n", protocol);
+			return FAILURE;
+		}
+	}
+
 	/*printf("ssid: %s pwd: %s bssid: %s use_wpa3: %s listen_interval: %s band_mode: %s\n",
 	  ssid, pwd, bssid, use_wpa3, listen_interval, band_mode);*/
 
@@ -676,7 +733,9 @@ static int handle_connect(int argc, char **argv) {
 			bssid,
 			use_wpa3_value,
 			listen_interval_value,
-			band_mode_value
+			band_mode_value,
+			bandwidth_value,
+			protocol_value
 			);
 }
 

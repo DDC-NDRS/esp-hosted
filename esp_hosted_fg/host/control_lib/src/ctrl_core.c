@@ -492,6 +492,8 @@ static int ctrl_app_parse_resp(CtrlMsg *ctrl_msg, ctrl_cmd_t *app_resp)
 					p->rssi = ctrl_msg->resp_get_ap_config->rssi;
 					p->encryption_mode = ctrl_msg->resp_get_ap_config->sec_prot;
 					p->band_mode = ctrl_msg->resp_get_ap_config->band_mode;
+					p->bandwidth = ctrl_msg->resp_get_ap_config->bw;
+					p->protocol = ctrl_msg->resp_get_ap_config->protocol;
 					break;
 
 				case FAILURE:
@@ -1487,6 +1489,8 @@ int ctrl_app_send_req(ctrl_cmd_t *app_req)
 			req_payload->is_wpa3_supported = p->is_wpa3_supported;
 			req_payload->listen_interval = p->listen_interval;
 			req_payload->band_mode = p->band_mode;
+			req_payload->bw = p->bandwidth;
+			req_payload->protocol = p->protocol;
 			break;
 		} case CTRL_REQ_SET_SOFTAP_VND_IE: {
 			wifi_softap_vendor_ie_t *p = &app_req->u.wifi_softap_vendor_ie;
