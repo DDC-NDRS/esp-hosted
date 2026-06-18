@@ -245,6 +245,8 @@ message CtrlMsg_Resp_GetAPConfig {
 	Ctrl_WifiSecProt sec_prot = 5;
 	int32 resp = 6;
 	int32 band_mode = 7;
+	int32 bw = 8;
+	int32 protocol = 9;
 }
 
 message CtrlMsg_Req_ConnectAP {
@@ -254,6 +256,8 @@ message CtrlMsg_Req_ConnectAP {
 	bool is_wpa3_supported = 4;
 	int32 listen_interval = 5;
 	int32 band_mode = 6;
+	int32 bw = 7;
+	int32 protocol = 8;
 }
 
 message  CtrlMsg_Resp_ConnectAP {
@@ -275,6 +279,7 @@ message CtrlMsg_Resp_GetSoftAPConfig {
 	int32 bw = 7;
 	int32 resp = 8;
 	int32 band_mode = 9;
+	int32 protocol = 10;
 }
 
 message CtrlMsg_Req_StartSoftAP {
@@ -286,6 +291,7 @@ message CtrlMsg_Req_StartSoftAP {
 	bool ssid_hidden = 6;
 	int32 bw = 7;
 	int32 band_mode = 8;
+	int32 protocol = 9;
 }
 
 message CtrlMsg_Resp_StartSoftAP {

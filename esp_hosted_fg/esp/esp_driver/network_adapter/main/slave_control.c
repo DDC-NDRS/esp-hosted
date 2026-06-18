@@ -23,6 +23,7 @@
 #include "esp_ota_ops.h"
 #include "slave_bt.h"
 #include "esp_fw_version.h"
+#include "esp_hosted_wifi_phy.h"
 #ifdef CONFIG_NETWORK_SPLIT_ENABLED
   #include "esp_check.h"
   #include "lwip/inet.h"
@@ -792,6 +793,136 @@ err:
 	return ESP_OK;
 }
 
+/* Validate a requested PHY combo (band_mode/protocol/bw) before touching the
+ * radio. Returns ESP_OK if applicable, else logs why and returns an error (the
+ * caller rejects). The negotiated result may still be lower than requested
+ * (e.g. HT40 against a 20 MHz AP) - that is IDF's call, reported via GetAPConfig. */
+static esp_err_t validate_wifi_phy_config(int band_mode, int protocol, int bw)
+{
+	bool band_specific = (band_mode == WIFI_BAND_MODE_2G_ONLY ||
+			band_mode == WIFI_BAND_MODE_5G_ONLY);
+
+	if (bw < 0 || bw > H_WIFI_BW_HT40) {
+		ESP_LOGE(TAG, "Invalid bw %d (expect 0=unset/1=HT20/2=HT40)", bw);
+		return ESP_ERR_INVALID_ARG;
+	}
+	if (protocol) {
+		if (protocol & ~H_WIFI_PROTOCOL_MASK) {
+			ESP_LOGE(TAG, "Invalid protocol bitmap 0x%x", protocol);
+			return ESP_ERR_INVALID_ARG;
+		}
+		if (!band_specific) {
+			ESP_LOGE(TAG, "protocol requires a specific band_mode (2.4G or 5G), not AUTO");
+			return ESP_ERR_INVALID_ARG;
+		}
+		/* only cumulative, band-appropriate combos are valid (esp_wifi.h) */
+		if (band_mode == WIFI_BAND_MODE_2G_ONLY) {
+			switch (protocol) {
+			case H_WIFI_PROTOCOL_11B:
+			case H_PHY_2G_LEGACY:
+			case H_PHY_2G_11N:
+			case H_PHY_2G_11AX:
+			case H_PHY_2G_LR:
+				break;
+			default:
+				ESP_LOGE(TAG, "protocol 0x%x invalid for 2.4G (use b/bg/bgn/bgnax/lr)", protocol);
+				return ESP_ERR_INVALID_ARG;
+			}
+		} else { /* 5G */
+			switch (protocol) {
+			case H_PHY_5G_LEGACY:
+			case H_PHY_5G_11N:
+			case H_PHY_5G_11AC:
+			case H_PHY_5G_11AX:
+				break;
+			default:
+				ESP_LOGE(TAG, "protocol 0x%x invalid for 5G (use a/an/anac/anacax)", protocol);
+				return ESP_ERR_INVALID_ARG;
+			}
+		}
+	}
+	if (bw == H_WIFI_BW_HT40) {
+		/* HT40 exists only in 11n on this silicon; needs 11n without 11ax/ac. */
+		if (!protocol ||
+				(protocol & (H_WIFI_PROTOCOL_11AX | H_WIFI_PROTOCOL_11AC)) ||
+				!(protocol & H_WIFI_PROTOCOL_11N)) {
+			ESP_LOGE(TAG, "HT40 requires 11n without 11ax/ac: pass protocol=11bgn (2.4G) "
+					"or 11an (5G) and a specific band_mode");
+			return ESP_ERR_INVALID_ARG;
+		}
+	}
+	return ESP_OK;
+}
+
+/* Fill a wifi_config_t for the station from the request (ssid/pwd/bssid/wpa3/
+ * listen-interval). Returns ESP_OK, or ESP_FAIL on a malformed BSSID. */
+static esp_err_t fill_sta_wifi_config(CtrlMsgReqConnectAP *cfg, wifi_config_t *wifi_cfg)
+{
+	/* Connect to the strongest signal when several APs share an SSID - a small
+	 * scan cost for a notable data-throughput gain. */
+	wifi_cfg->sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+	wifi_cfg->sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+
+	if (cfg->ssid)
+		strlcpy((char *)wifi_cfg->sta.ssid, cfg->ssid, sizeof(wifi_cfg->sta.ssid));
+	if (cfg->pwd)
+		strlcpy((char *)wifi_cfg->sta.password, cfg->pwd, sizeof(wifi_cfg->sta.password));
+	if (cfg->bssid && strlen((char *)cfg->bssid)) {
+		if (convert_mac_to_bytes(wifi_cfg->sta.bssid, cfg->bssid)) {
+			ESP_LOGE(TAG, "Failed to convert BSSID into bytes");
+			return ESP_FAIL;
+		}
+		wifi_cfg->sta.bssid_set = true;
+	}
+	if (cfg->is_wpa3_supported) {
+		wifi_cfg->sta.pmf_cfg.capable = true;
+		wifi_cfg->sta.pmf_cfg.required = false;
+	}
+	if (cfg->listen_interval >= 0)
+		wifi_cfg->sta.listen_interval = cfg->listen_interval;
+	return ESP_OK;
+}
+
+/* Apply requested PHY protocol + bandwidth to the STA (band_mode is set by the
+ * caller first). Sets *wifi_changed when anything changed. Protocol must precede
+ * bandwidth (HT40 is only valid once 11ax/ac is dropped). */
+static esp_err_t apply_sta_protocol_bw(CtrlMsgReqConnectAP *cfg, bool *wifi_changed)
+{
+	esp_err_t ret;
+
+	if (cfg->protocol) {
+		ret = esp_wifi_set_protocol(WIFI_IF_STA, cfg->protocol);
+		if (ret) {
+			ESP_LOGE(TAG, "Failed to set STA protocol 0x%x [0x%x]", cfg->protocol, ret);
+			return ret;
+		}
+		ESP_LOGI(TAG, "Set STA protocol to 0x%x", cfg->protocol);
+		*wifi_changed = true;
+	}
+	if (cfg->bw) {
+#if WIFI_DUALBAND_SUPPORT
+		wifi_band_mode_t band_mode = WIFI_BAND_MODE_AUTO;
+		wifi_bandwidths_t bandwidths = { 0 };
+		esp_wifi_get_band_mode(&band_mode);
+		switch (band_mode) {
+		case WIFI_BAND_MODE_2G_ONLY: bandwidths.ghz_2g = cfg->bw; break;
+		case WIFI_BAND_MODE_5G_ONLY: bandwidths.ghz_5g = cfg->bw; break;
+		default: bandwidths.ghz_2g = cfg->bw; bandwidths.ghz_5g = cfg->bw; break;
+		}
+		ret = esp_wifi_set_bandwidths(WIFI_IF_STA, &bandwidths);
+#else
+		ret = esp_wifi_set_bandwidth(WIFI_IF_STA, cfg->bw);
+#endif
+		if (ret) {
+			ESP_LOGE(TAG, "Failed to set STA bandwidth %d [0x%x]", cfg->bw, ret);
+			return ret;
+		}
+		ESP_LOGI(TAG, "Set STA bandwidth to %d", cfg->bw);
+		*wifi_changed = true;
+	}
+	return ESP_OK;
+}
+
 /* Function connects to received AP configuration. */
 static esp_err_t req_connect_ap_handler (CtrlMsg *req,
 		CtrlMsg *resp, void *priv_data)
@@ -823,6 +954,14 @@ static esp_err_t req_connect_ap_handler (CtrlMsg *req,
 	resp->payload_case = CTRL_MSG__PAYLOAD_RESP_CONNECT_AP;
 	resp->resp_connect_ap = resp_payload;
 	resp_payload->resp = SUCCESS;
+
+	/* Reject an unsupportable PHY combo up front (wifi_cfg still NULL => clean
+	 * early return via reject). */
+	if (validate_wifi_phy_config(req->req_connect_ap->band_mode,
+			req->req_connect_ap->protocol, req->req_connect_ap->bw) != ESP_OK) {
+		resp_payload->resp = FAILURE;
+		goto reject;
+	}
 
 	ret = esp_wifi_get_mode(&mode);
 	if (ret) {
@@ -856,37 +995,10 @@ static esp_err_t req_connect_ap_handler (CtrlMsg *req,
 		goto err;
 	}
 
-	/* Make sure that we connect to strongest signal, when multiple SSID with
-	 * the same name. This should take a small extra time to search for all SSIDs,
-	 * but with this, there will be high performance gain on data throughput
-	 */
-	wifi_cfg->sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
-	wifi_cfg->sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
-	/* Fill wifi_cfg with new request parameters */
-	if (req->req_connect_ap->ssid) {
-		strlcpy((char *)wifi_cfg->sta.ssid, req->req_connect_ap->ssid,
-				sizeof(wifi_cfg->sta.ssid));
-	}
-	if (req->req_connect_ap->pwd) {
-		strlcpy((char *)wifi_cfg->sta.password, req->req_connect_ap->pwd,
-				sizeof(wifi_cfg->sta.password));
-	}
-	if ((req->req_connect_ap->bssid) &&
-			(strlen((char *)req->req_connect_ap->bssid))) {
-		ret = convert_mac_to_bytes(wifi_cfg->sta.bssid, req->req_connect_ap->bssid);
-		if (ret) {
-			ESP_LOGE(TAG, "Failed to convert BSSID into bytes");
-			resp_payload->resp = ret;
-			goto err;
-		}
-		wifi_cfg->sta.bssid_set = true;
-	}
-	if (req->req_connect_ap->is_wpa3_supported) {
-		wifi_cfg->sta.pmf_cfg.capable = true;
-		wifi_cfg->sta.pmf_cfg.required = false;
-	}
-	if (req->req_connect_ap->listen_interval >= 0) {
-		wifi_cfg->sta.listen_interval = req->req_connect_ap->listen_interval;
+	ret = fill_sta_wifi_config(req->req_connect_ap, wifi_cfg);
+	if (ret) {
+		resp_payload->resp = ret;
+		goto err;
 	}
 
 #if WIFI_DUALBAND_SUPPORT
@@ -915,6 +1027,13 @@ static esp_err_t req_connect_ap_handler (CtrlMsg *req,
 		wifi_changed = true;
 	}
 #endif
+
+	/* Apply requested protocol + bandwidth (validated above; band_mode already set). */
+	ret = apply_sta_protocol_bw(req->req_connect_ap, &wifi_changed);
+	if (ret) {
+		resp_payload->resp = ret;
+		goto reject;
+	}
 
 	ret = esp_wifi_get_mac(WIFI_IF_STA, mac);
 	if (ret) {
@@ -1010,6 +1129,14 @@ err:
 		mem_free(wifi_cfg);
 	}
 
+	return ESP_OK;
+
+	/* Failure path that preserves resp_payload->resp (unlike err:, which forces
+	 * SUCCESS for the async-connect semantics). Reached only via goto. */
+reject:
+	if (wifi_cfg) {
+		mem_free(wifi_cfg);
+	}
 	return ESP_OK;
 }
 
@@ -1109,6 +1236,26 @@ static esp_err_t req_get_ap_config_handler (CtrlMsg *req,
 	}
 	resp_payload->band_mode = band_mode;
 #endif
+
+	/* Effective PHY bandwidth of the STA link (1=HT20, 2=HT40), read back so
+	 * the host can verify the negotiated width after association. */
+#if WIFI_DUALBAND_SUPPORT
+	wifi_bandwidths_t bandwidths = { 0 };
+	/* pick band by connected channel: >14 => 5G, else 2.4G */
+	if (esp_wifi_get_bandwidths(WIFI_IF_STA, &bandwidths) == ESP_OK)
+		resp_payload->bw = (credentials.chnl > 14) ?
+			bandwidths.ghz_5g : bandwidths.ghz_2g;
+#else
+	wifi_bandwidth_t get_bw = 0;
+	if (esp_wifi_get_bandwidth(WIFI_IF_STA, &get_bw) == ESP_OK)
+		resp_payload->bw = get_bw;
+#endif
+
+	/* Effective PHY protocol bitmap of the STA (best-effort: get_protocol fails
+	 * under band mode AUTO, in which case leave 0). */
+	uint8_t get_proto = 0;
+	if (esp_wifi_get_protocol(WIFI_IF_STA, &get_proto) == ESP_OK)
+		resp_payload->protocol = get_proto;
 	resp_payload->resp = SUCCESS;
 
 err:
@@ -1275,8 +1422,15 @@ static esp_err_t req_get_softap_config_handler (CtrlMsg *req,
 		band_mode = WIFI_BAND_MODE_AUTO;
 	}
 	resp_payload->band_mode = band_mode;
+	wifi_protocols_t protocols = { 0 };
+	if (esp_wifi_get_protocols(WIFI_IF_AP, &protocols) == ESP_OK)
+		resp_payload->protocol = (credentials.chnl > 14) ?
+			protocols.ghz_5g : protocols.ghz_2g;
 #else
 	resp_payload->bw = get_bw;
+	uint8_t get_proto = 0;
+	if (esp_wifi_get_protocol(WIFI_IF_AP, &get_proto) == ESP_OK)
+		resp_payload->protocol = get_proto;
 #endif
 
 	resp_payload->resp = SUCCESS;
@@ -1284,6 +1438,79 @@ static esp_err_t req_get_softap_config_handler (CtrlMsg *req,
 
 err:
 	resp_payload->resp = FAILURE;
+	return ESP_OK;
+}
+
+/* Apply protocol + bandwidth to the SoftAP (band_mode already set by the caller).
+ * HT40 exists only in 11n on this silicon, so bw=40 auto-derives band-11n; an
+ * explicit 11ax/ac with bw=40, or protocol/HT40 under AUTO band, is rejected.
+ * Protocol is applied before bandwidth. Returns ESP_OK or an error. */
+static esp_err_t apply_softap_protocol_bw(int protocol, int bw)
+{
+	esp_err_t ret;
+#if WIFI_DUALBAND_SUPPORT
+	wifi_band_mode_t band_mode = WIFI_BAND_MODE_AUTO;
+	wifi_bandwidths_t bandwidths = { 0 };
+	bool band_specific;
+
+	esp_wifi_get_band_mode(&band_mode);
+	band_specific = (band_mode == WIFI_BAND_MODE_2G_ONLY ||
+			band_mode == WIFI_BAND_MODE_5G_ONLY);
+
+	if (protocol && !band_specific) {
+		ESP_LOGE(TAG, "SoftAP protocol needs a specific band_mode (2.4G or 5G)");
+		return ESP_ERR_INVALID_ARG;
+	}
+	if (bw == H_WIFI_BW_HT40) {
+		if (!band_specific) {
+			ESP_LOGE(TAG, "SoftAP bw=40 needs a specific band_mode (2.4G or 5G)");
+			return ESP_ERR_INVALID_ARG;
+		}
+		if (protocol == 0) {
+			protocol = (band_mode == WIFI_BAND_MODE_2G_ONLY) ? H_PHY_2G_11N : H_PHY_5G_11N;
+		} else if ((protocol & (H_WIFI_PROTOCOL_11AX | H_WIFI_PROTOCOL_11AC)) ||
+				!(protocol & H_WIFI_PROTOCOL_11N)) {
+			ESP_LOGE(TAG, "SoftAP HT40 needs 11n without 11ax/ac");
+			return ESP_ERR_INVALID_ARG;
+		}
+	}
+	if (protocol) {
+		wifi_protocols_t protocols = { 0 };
+		if (band_mode == WIFI_BAND_MODE_2G_ONLY)
+			protocols.ghz_2g = protocol;
+		else
+			protocols.ghz_5g = protocol;
+		ret = esp_wifi_set_protocols(WIFI_IF_AP, &protocols);
+		if (ret) {
+			ESP_LOGE(TAG, "Failed to set SoftAP protocol 0x%x [0x%x]", protocol, ret);
+			return ret;
+		}
+		ESP_LOGI(TAG, "Set SoftAP protocol to 0x%x", protocol);
+	}
+
+	switch (band_mode) {
+	case WIFI_BAND_MODE_2G_ONLY: bandwidths.ghz_2g = bw; break;
+	case WIFI_BAND_MODE_5G_ONLY: bandwidths.ghz_5g = bw; break;
+	default: bandwidths.ghz_2g = bw; bandwidths.ghz_5g = bw; break;
+	}
+	ret = esp_wifi_set_bandwidths(WIFI_IF_AP, &bandwidths);
+#else
+	/* Single-band (2.4G): bw=40 needs 11n; auto-derive when unset. */
+	if (bw == H_WIFI_BW_HT40 && protocol == 0)
+		protocol = H_PHY_2G_11N;
+	if (protocol) {
+		ret = esp_wifi_set_protocol(WIFI_IF_AP, protocol);
+		if (ret) {
+			ESP_LOGE(TAG, "Failed to set SoftAP protocol 0x%x [0x%x]", protocol, ret);
+			return ret;
+		}
+	}
+	ret = esp_wifi_set_bandwidth(WIFI_IF_AP, bw);
+#endif
+	if (ret) {
+		ESP_LOGE(TAG, "Failed to set SoftAP bandwidth");
+		return ret;
+	}
 	return ESP_OK;
 }
 
@@ -1297,7 +1524,6 @@ static esp_err_t req_start_softap_handler (CtrlMsg *req,
 	wifi_config_t *wifi_config = NULL;
 	CtrlMsgRespStartSoftAP *resp_payload = NULL;
 #if WIFI_DUALBAND_SUPPORT
-	wifi_bandwidths_t bandwidths = { 0 };
 	wifi_band_mode_t band_mode = 0; // 0 is currently an invalid value
 #endif
 
@@ -1399,33 +1625,12 @@ static esp_err_t req_start_softap_handler (CtrlMsg *req,
 		goto err;
 	}
 
-	// set bandwidth, based on band mode
-	switch (band_mode) {
-	case WIFI_BAND_MODE_2G_ONLY:
-		bandwidths.ghz_2g = req->req_start_softap->bw;
-		break;
-	case WIFI_BAND_MODE_5G_ONLY:
-		bandwidths.ghz_5g = req->req_start_softap->bw;
-		break;
-	// auto and default have the same settings
-	case WIFI_BAND_MODE_AUTO:
-	default:
-		bandwidths.ghz_2g = req->req_start_softap->bw;
-		bandwidths.ghz_5g = req->req_start_softap->bw;
-		break;
-	}
-	ret = esp_wifi_set_bandwidths(WIFI_IF_AP, &bandwidths);
-	if (ret) {
-		ESP_LOGE(TAG,"Failed to set bandwidth");
-		goto err;
-	}
-#else
-	ret = esp_wifi_set_bandwidth(WIFI_IF_AP,req->req_start_softap->bw);
-	if (ret) {
-		ESP_LOGE(TAG,"Failed to set bandwidth");
-		goto err;
-	}
 #endif
+	/* Apply requested protocol + bandwidth (auto-derives 11n for bw=40). */
+	ret = apply_softap_protocol_bw(req->req_start_softap->protocol,
+			req->req_start_softap->bw);
+	if (ret)
+		goto err;
 
 	ESP_LOGI(TAG, MACSTR, MAC2STR(mac));
 

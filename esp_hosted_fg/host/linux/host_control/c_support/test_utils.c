@@ -630,6 +630,8 @@ int ctrl_app_resp_callback(ctrl_cmd_t * app_resp)
 				printf("AP's rssi %d\n", p->rssi);
 				printf("AP's encryption mode %d\n", p->encryption_mode);
 				printf("AP's band mode %d\n", p->band_mode);
+				printf("STA link bandwidth %d (1=HT20, 2=HT40, 0=unset)\n", p->bandwidth);
+				printf("STA PHY protocol bitmap 0x%x (0x4=11n 0x40=11ax 0x20=11ac)\n", p->protocol);
 			} else {
 				printf("Station mode status: %s\n",p->status);
 			}
@@ -656,6 +658,7 @@ int ctrl_app_resp_callback(ctrl_cmd_t * app_resp)
 			printf("softAP ssid broadcast status %d \n", resp_p->ssid_hidden);
 			printf("softAP bandwidth mode %d \n", resp_p->bandwidth);
 			printf("softAP band mode %d \n", resp_p->band_mode);
+			printf("softAP PHY protocol bitmap 0x%x (0x4=11n 0x40=11ax 0x20=11ac)\n", resp_p->protocol);
 
 			break;
 		} case CTRL_RESP_SET_SOFTAP_VND_IE : {
@@ -940,6 +943,8 @@ int test_async_station_mode_connect(void)
 	req->u.wifi_ap_config.is_wpa3_supported = STATION_MODE_IS_WPA3_SUPPORTED;
 	req->u.wifi_ap_config.listen_interval = STATION_MODE_LISTEN_INTERVAL;
 	req->u.wifi_ap_config.band_mode = STATION_BAND_MODE;
+	req->u.wifi_ap_config.bandwidth = STATION_MODE_BANDWIDTH;
+	req->u.wifi_ap_config.protocol = STATION_MODE_PROTOCOL;
 
 	/* register callback for handling asynch reply */
 	req->ctrl_resp_cb = ctrl_app_resp_callback;
@@ -975,6 +980,8 @@ int test_station_mode_connect(void)
 	req->u.wifi_ap_config.is_wpa3_supported = STATION_MODE_IS_WPA3_SUPPORTED;
 	req->u.wifi_ap_config.listen_interval = STATION_MODE_LISTEN_INTERVAL;
 	req->u.wifi_ap_config.band_mode = STATION_BAND_MODE;
+	req->u.wifi_ap_config.bandwidth = STATION_MODE_BANDWIDTH;
+	req->u.wifi_ap_config.protocol = STATION_MODE_PROTOCOL;
 
 	connected_printed = false;
 	disconnected_printed = false;
@@ -1051,6 +1058,7 @@ int test_softap_mode_start(void)
 	req->u.wifi_softap_config.ssid_hidden = SOFTAP_MODE_SSID_HIDDEN;
 	req->u.wifi_softap_config.bandwidth = SOFTAP_MODE_BANDWIDTH;
 	req->u.wifi_softap_config.band_mode = SOFTAP_BAND_MODE;
+	req->u.wifi_softap_config.protocol = SOFTAP_MODE_PROTOCOL;
 
 	resp = wifi_start_softap(req);
 
@@ -1766,7 +1774,7 @@ int test_softap_mode_set_vendor_ie(bool enable, const char *data) {
 
 /* Updated connect function with parameters */
 int test_station_mode_connect_with_params(const char *ssid, const char *pwd, const char *bssid,
-		bool use_wpa3, int listen_interval, int band_mode)
+		bool use_wpa3, int listen_interval, int band_mode, int bandwidth, int protocol)
 {
 	ctrl_cmd_t *req = CTRL_CMD_DEFAULT_REQ();
 	ctrl_cmd_t *resp = NULL;
@@ -1786,6 +1794,8 @@ int test_station_mode_connect_with_params(const char *ssid, const char *pwd, con
 	req->u.wifi_ap_config.is_wpa3_supported = use_wpa3 ? 1 : STATION_MODE_IS_WPA3_SUPPORTED;
 	req->u.wifi_ap_config.listen_interval = listen_interval ? listen_interval : STATION_MODE_LISTEN_INTERVAL;
 	req->u.wifi_ap_config.band_mode = band_mode ? band_mode : STATION_BAND_MODE;
+	req->u.wifi_ap_config.bandwidth = bandwidth;
+	req->u.wifi_ap_config.protocol = protocol;
 
     connected_printed = false;
     disconnected_printed = false;
@@ -1824,7 +1834,7 @@ int test_station_mode_disconnect_with_params(bool reset_dhcp)
 /* Updated softap start function with parameters */
 int test_softap_mode_start_with_params(const char *ssid, const char *pwd, int channel,
 		const char *sec_prot, int max_conn, bool hide_ssid,
-		int bw, int band_mode)
+		int bw, int band_mode, int protocol)
 {
 	/* implemented synchronous */
 	ctrl_cmd_t *req = CTRL_CMD_DEFAULT_REQ();
@@ -1859,6 +1869,7 @@ int test_softap_mode_start_with_params(const char *ssid, const char *pwd, int ch
 	req->u.wifi_softap_config.ssid_hidden = hide_ssid ? 1 : SOFTAP_MODE_SSID_HIDDEN;
 	req->u.wifi_softap_config.bandwidth = bw ? bw : SOFTAP_MODE_BANDWIDTH;
 	req->u.wifi_softap_config.band_mode = band_mode ? band_mode : SOFTAP_BAND_MODE;
+	req->u.wifi_softap_config.protocol = protocol;
 
 	resp = wifi_start_softap(req);
 	CLEANUP_CTRL_MSG(req);
