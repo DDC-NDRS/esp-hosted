@@ -648,6 +648,9 @@ static int handle_connect(int argc, char **argv) {
 	const char *protocol = get_arg_value(argc, argv, connect_ap_args,
 			sizeof(connect_ap_args)/sizeof(cmd_arg_t),
 			"--protocol");
+	const char *run_dhcp_client = get_arg_value(argc, argv, connect_ap_args,
+			sizeof(connect_ap_args)/sizeof(cmd_arg_t),
+			"--run_dhcp_client");
 
 	/* Use default values from ctrl_config.h if arguments are not provided */
 	if (!ssid || strlen(ssid)==0) {
@@ -727,6 +730,8 @@ static int handle_connect(int argc, char **argv) {
 
 	/*printf("ssid: %s pwd: %s bssid: %s use_wpa3: %s listen_interval: %s band_mode: %s\n",
 	  ssid, pwd, bssid, use_wpa3, listen_interval, band_mode);*/
+
+	test_set_run_dhcp_client(run_dhcp_client ? is_arg_true(run_dhcp_client) : false);
 
 	return test_station_mode_connect_with_params(
 			ssid,

@@ -6,10 +6,15 @@ CC = gcc
 # CFLAGS = -Wall --sysroot=$(SDKTARGETSYSROOT) -g
 # LINKER = --sysroot=$(SDKTARGETSYSROOT) -lpthread -lrt
 
-SDKTARGETSYSROOT :=
-CROSS_COMPILE :=
-CFLAGS = -Wall -g
-LINKER = -lpthread -lrt
+# Cross-compile via command-line args (no edits needed), e.g. for a Yocto SDK:
+#   make CROSS_COMPILE=<toolchain>/aarch64-poky-linux- \
+#        SDKTARGETSYSROOT=<sysroot> \
+#        REPLXX_INC_PATH=<replxx>/include REPLXX_LIB_PATH=<replxx>/lib RPATH_FLAGS=
+SDKTARGETSYSROOT ?=
+CROSS_COMPILE ?=
+SYSROOT_FLAG := $(if $(SDKTARGETSYSROOT),--sysroot=$(SDKTARGETSYSROOT))
+CFLAGS = -Wall -g $(SYSROOT_FLAG)
+LINKER = $(SYSROOT_FLAG) -lpthread -lrt
 
 # Library search path for replxx - can be customized:
 #   Default:              make
@@ -17,6 +22,7 @@ LINKER = -lpthread -lrt
 #   Multiple paths:       make REPLXX_LIB_PATH=/path1:/path2
 #   Disable RPATH:        make RPATH_FLAGS=
 REPLXX_LIB_PATH ?= /usr/local/lib
+REPLXX_INC_PATH ?= /usr/local/include
 RPATH_FLAGS = -Wl,-rpath,$(REPLXX_LIB_PATH)
 
 # Sanitizer options - can be customized:
@@ -60,7 +66,7 @@ INCLUDE += -I$(DIR_CTRL_LIB)/src/include
 INCLUDE += -I$(DIR_SERIAL)/include
 INCLUDE += -I$(DIR_COMPONENTS)/include
 INCLUDE += -I$(DIR_LINUX_PORT)/include
-INCLUDE += -I/usr/local/include
+INCLUDE += -I$(REPLXX_INC_PATH)
 INCLUDE += -I.
 
 # Set library path
@@ -72,7 +78,7 @@ LIBS = -Wl,--whole-archive $(CONTROL_LIB) -Wl,--no-whole-archive
 #   - System paths (/usr/include, /usr/local/include)
 #   - Custom include paths added via INCLUDE variable
 #   - Cross-compilation toolchain paths
-REPLXX_INSTALLED := $(shell echo '\#include <replxx.h>' | $(CROSS_COMPILE)$(CC) -E - $(INCLUDE) >/dev/null 2>&1 && echo "yes" || echo "no")
+REPLXX_INSTALLED := $(shell echo '\#include <replxx.h>' | $(CROSS_COMPILE)$(CC) $(CFLAGS) -E - $(INCLUDE) >/dev/null 2>&1 && echo "yes" || echo "no")
 
 ifeq ($(REPLXX_INSTALLED), yes)
     BUILD_SHELL := hosted_shell
@@ -117,7 +123,7 @@ hosted_daemon.out: $(HOSTED_DAEMON_OBJS)
 hosted_shell: ensure_libs hosted_shell.out
 
 hosted_shell.out: hosted_shell.o $(COMMON_OBJS)
-	$(CROSS_COMPILE)$(CC) $(CFLAGS) $(CFLAGS_SANITIZE) $(INCLUDE) $(LIBPATH) -o $(@) $^ $(LINKER) $(LIBS) -lreplxx -lstdc++
+	$(CROSS_COMPILE)$(CC) $(CFLAGS) $(CFLAGS_SANITIZE) $(INCLUDE) $(LIBPATH) -L$(REPLXX_LIB_PATH) -o $(@) $^ $(LINKER) $(LIBS) -lreplxx -lstdc++ $(RPATH_FLAGS)
 
 %.o: %.c
 	$(CROSS_COMPILE)$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@

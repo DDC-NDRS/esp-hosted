@@ -27,6 +27,7 @@
 #include "app_peer_data_transfer.h"
 
 #define DEMO_SLEEP_DURATION_SEC 50
+#define STA_CONNECT_WAIT_SEC    20
 
  /* Heartbeat demo needs to wait for events
   * For simplicity, we disable heartbeat demo
@@ -58,6 +59,23 @@ static void inline usage(char *argv[])
 /* forward declaration of functions used */
 static int run_peer_data_example(void);
 
+/* sta_connect [ssid] [pwd] [2.4G|5G] : args optional (no args = compiled defaults).
+ * main() blocks on the STA-Connected event afterward (unless --non-blocking). */
+static int sta_connect_cli(char *args[])
+{
+	if (!args || !args[0])
+		return test_station_mode_connect();          /* compiled defaults */
+	const char *ssid = args[0];
+	const char *pwd  = args[1] ? args[1] : "";
+	int band = STATION_BAND_MODE;                        /* auto */
+	if (args[1] && args[2]) {
+		if (!strcasecmp(args[2], "2.4G") || !strcasecmp(args[2], "2.4")) band = 1;  /* 2G only */
+		else if (!strcasecmp(args[2], "5G")  || !strcasecmp(args[2], "5"))  band = 2;  /* 5G only */
+	}
+	printf("Connect to AP[%s] band_mode[%d]\n", ssid, band);
+	return test_station_mode_connect_with_params(ssid, pwd, "", false, 0, band, 0, 0);
+}
+
 static int parse_cli_cmd(char *in_cmd, char *args[])
 {
 	bool cmd_executed = false;
@@ -70,7 +88,7 @@ static int parse_cli_cmd(char *in_cmd, char *args[])
 	EXEC_IF_CMD_EQUALS(SET_SOFTAP_MAC_ADDR, test_softap_mode_set_mac_addr_of_esp(SOFTAP_MODE_MAC_ADDRESS));
 	EXEC_IF_CMD_EQUALS(GET_SOFTAP_MAC_ADDR, test_softap_mode_get_mac_addr(mac_address));
 	EXEC_IF_CMD_EQUALS(GET_AP_SCAN_LIST, test_get_available_wifi());
-	EXEC_IF_CMD_EQUALS(STA_CONNECT, test_station_mode_connect());
+	EXEC_IF_CMD_EQUALS(STA_CONNECT, sta_connect_cli(args));
 	EXEC_IF_CMD_EQUALS(GET_STA_CONFIG, test_station_mode_get_info());
 	EXEC_IF_CMD_EQUALS(STA_DISCONNECT, test_station_mode_disconnect());
 	EXEC_IF_CMD_EQUALS(SET_WIFI_MODE, test_set_wifi_mode_station());
@@ -142,6 +160,22 @@ static void sig_handler(int signum)
 	cleanup_app();
 }
 
+/* Strip --non-blocking/-nb from argv; returns whether to block on connect.
+ * Default is blocking so we don't exit and leave ethsta0 dangling. */
+static bool parse_blocking_flag(int *argc, char **argv)
+{
+	bool blocking = true;
+	for (int i = 1; i < *argc; i++) {
+		if (!strcasecmp(argv[i], "--non-blocking") || !strcasecmp(argv[i], "-nb")) {
+			blocking = false;
+			for (int j = i; j < *argc - 1; j++)
+				argv[j] = argv[j + 1];
+			(*argc)--; i--;
+		}
+	}
+	return blocking;
+}
+
 int main(int argc, char *argv[])
 {
 	char * cli_cmd = NULL;
@@ -152,6 +186,8 @@ int main(int argc, char *argv[])
 		printf("Please re-run program with superuser access\n");
 		return FAILURE;
 	}
+
+	bool blocking = parse_blocking_flag(&argc, argv);
 
 	if (argc == 1) {
 		usage(argv);
@@ -180,6 +216,19 @@ int main(int argc, char *argv[])
 
 	cli_cmd = argv[1];
 	if (SUCCESS == parse_cli_cmd(cli_cmd, &argv[2])) {
+
+		/* connect is async; optionally wait for the event (brings ethsta0 up). */
+		if (blocking && !strncasecmp(cli_cmd, STA_CONNECT, sizeof(STA_CONNECT))) {
+			printf("Waiting up to %d s for station connect result...\n", STA_CONNECT_WAIT_SEC);
+			switch (test_wait_sta_connect(STA_CONNECT_WAIT_SEC)) {
+			case STA_CONN_CONNECTED:
+				printf("Station connected; ethsta0 is up.\n"); break;
+			case STA_CONN_DISCONNECTED:
+				printf("Station connect failed/disconnected; ethsta0 is down.\n"); break;
+			default:
+				printf("Timeout: no station connect result in %d s.\n", STA_CONNECT_WAIT_SEC); break;
+			}
+		}
 
 #if ENABLE_HEARTBEAT
 		sleep(2);

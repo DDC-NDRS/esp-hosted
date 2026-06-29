@@ -1016,6 +1016,7 @@ static void ctrl_rx_thread(void const *arg)
 		/* 3.2 Decode protobuf */
 		resp = ctrl_msg__unpack(NULL, buf_len, buf);
 		if (!resp) {
+			command_log("unpack failed buf_len=%u\n", buf_len);
 			goto free_bufs;
 		}
 		/* 3.3 Free the read buffer */
@@ -1805,18 +1806,9 @@ int deinit_hosted_control_lib_internal(void)
 
 	set_ctrl_lib_state(CTRL_LIB_STATE_INACTIVE);
 
-	if (ctrl_msg_Q) {
-		esp_queue_destroy(&ctrl_msg_Q);
-	}
-
-	if (ctrl_req_sem && hosted_destroy_semaphore(ctrl_req_sem)) {
+	if (ctrl_rx_thread_handle && cancel_ctrl_rx_thread()) {
 		ret = FAILURE;
-		command_log("ctrl req sem deinit failed\n");
-	}
-
-	if (read_sem && hosted_destroy_semaphore(read_sem)) {
-		ret = FAILURE;
-		command_log("read sem deinit failed\n");
+		command_log("cancel ctrl rx thread failed\n");
 	}
 
 	if (async_timer_handle) {
@@ -1830,9 +1822,18 @@ int deinit_hosted_control_lib_internal(void)
 		//command_log("Serial de-init failed\n");
 	}
 
-	if (ctrl_rx_thread_handle && cancel_ctrl_rx_thread()) {
+	if (ctrl_msg_Q) {
+		esp_queue_destroy(&ctrl_msg_Q);
+	}
+
+	if (ctrl_req_sem && hosted_destroy_semaphore(ctrl_req_sem)) {
 		ret = FAILURE;
-		command_log("cancel ctrl rx thread failed\n");
+		command_log("ctrl req sem deinit failed\n");
+	}
+
+	if (read_sem && hosted_destroy_semaphore(read_sem)) {
+		ret = FAILURE;
+		command_log("read sem deinit failed\n");
 	}
 
 	return ret;

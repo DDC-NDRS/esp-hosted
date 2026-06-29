@@ -70,6 +70,11 @@ ARCH=""
 
 ############  Script control options ###########################
 TEST_RAW_TP="0"
+# Module param, raw_tp_mode: non-zero starts the raw-throughput test at runtime.
+# Values match esp_hosted_ng: 1 = Host->ESP, 2 = ESP->Host. Empty => not passed.
+raw_tp_mode=""
+# Build with -DESP_DEBUG_STATS to enable SDIO aggregation debug counters in dmesg
+DEBUG_STATS="0"
 DRY_RUN="0"
 SKIP_BUILD_APPS="0"
 SKIP_MODULE_BUILD="0"
@@ -248,6 +253,12 @@ build_module()
 		VAL_CONFIG_TEST_RAW_TP=y
 	fi
 
+	if [ "$DEBUG_STATS" = "0" ] ; then
+		VAL_CONFIG_DEBUG_STATS=n
+	else
+		VAL_CONFIG_DEBUG_STATS=y
+	fi
+
 	if [ "$BT_CONFIG" != "" ] ; then
 		VAL_BT_ENABLED=y
 	else
@@ -277,7 +288,7 @@ build_module()
 	log "Using KERNEL as $KERNEL_BUILD_DIR"
 	log "Using CONFIG_TEST_RAW_TP as $CONFIG_TEST_RAW_TP"
 
-	make -j8 target="$IF_TYPE" KERNEL="$KERNEL_BUILD_DIR" ARCH="$ARCH" CONFIG_TEST_RAW_TP="$VAL_CONFIG_TEST_RAW_TP" CONFIG_BT_ENABLED="$VAL_BT_ENABLED"
+	make -j8 target="$IF_TYPE" KERNEL="$KERNEL_BUILD_DIR" ARCH="$ARCH" CONFIG_TEST_RAW_TP="$VAL_CONFIG_TEST_RAW_TP" CONFIG_BT_ENABLED="$VAL_BT_ENABLED" CONFIG_DEBUG_STATS="$VAL_CONFIG_DEBUG_STATS"
 
 	# Check the exit status of make
 	if [ $? -ne 0 ] ; then
@@ -402,9 +413,21 @@ parse_arguments() {
 					exit 1
 				fi
 				;;
-			rawtp)
-				log "Test RAW TP"
-				TEST_RAW_TP="1"
+			rawtp-host-to-esp | rawtp-host-to-esp=*)
+				raw_tp_mode="1"
+				# optional =sdio/=spi picks the bus; bare token defaults to SDIO later
+				case "$arg" in *=*) WIFI_TP="${arg#*=}"; IF_TYPE="$WIFI_TP" ;; esac
+				log "Test RAW TP: Host -> ESP (raw_tp_mode=1)"
+				;;
+			rawtp-esp-to-host | rawtp-esp-to-host=*)
+				raw_tp_mode="2"
+				# optional =sdio/=spi picks the bus; bare token defaults to SDIO later
+				case "$arg" in *=*) WIFI_TP="${arg#*=}"; IF_TYPE="$WIFI_TP" ;; esac
+				log "Test RAW TP: ESP -> Host (raw_tp_mode=2)"
+				;;
+			debugstats | debug-stats)
+				DEBUG_STATS="1"
+				log "SDIO debug stats enabled (ESP_DEBUG_STATS)"
 				;;
 			clockspeed=*)
 				clockspeed=${arg#*=}
@@ -497,6 +520,15 @@ verify_transport_combination()
 		fi
 	fi
 
+	# raw-TP needs a transport but no wifi= : default to SDIO only when none was
+	# given. Pass wifi=spi (or wifi=sdio) to pick another bus - that sets IF_TYPE
+	# above, so this default is skipped.
+	if [ "$IF_TYPE" = "" ] && [ "$raw_tp_mode" != "" ] ; then
+		WIFI_TP="sdio"
+		IF_TYPE="sdio"
+		log "raw-TP: no transport specified, defaulting to SDIO (pass wifi=spi for SPI)"
+	fi
+
 	if [ "$IF_TYPE" = "" ] ; then
 		echo ""
 		error "No valid transport configured"
@@ -582,7 +614,9 @@ usage() {
 	echo "                                 Default: auto-detected"
 	echo ""
 	echo "Test & Performance:"
-	echo "  rawtp                        Enable RAW throughput test mode"
+	echo "  rawtp_host_to_esp[=sdio|spi] Start RAW throughput test: Host -> ESP (default bus: sdio)"
+	echo "  rawtp_esp_to_host[=sdio|spi] Start RAW throughput test: ESP -> Host (default bus: sdio)"
+	echo "  debugstats                   Build with SDIO aggregation debug counters (printed to dmesg)"
 	echo "  cpu-perf=<on/off>            Set CPU performance mode (default: on)"
 	echo ""
 	echo "Script Control:"
@@ -633,6 +667,10 @@ populate_module_params()
 	add_module_param "resetpin"
 	add_module_param "clockspeed"
 
+	if [ "$raw_tp_mode" != "" ]; then
+		add_module_param "raw_tp_mode"
+	fi
+
 	if [ "$IF_TYPE" = "spi" ]; then
 		add_module_param "spi_bus"
 		add_module_param "spi_cs"
@@ -678,7 +716,8 @@ display_configuration_summary()
 	echo "  Architecture         : ${ARCH:-auto-detect}"
 	echo "  Kernel Build Dir     : $KERNEL_BUILD_DIR"
 	echo "  Cross Compile        : ${CROSS_COMPILE:-Not Set}"
-	echo "  RAW TP Test          : $([ "$TEST_RAW_TP" = "1" ] && echo "Enabled" || echo "Disabled")"
+	echo "  RAW TP               : $([ -n "$raw_tp_mode" ] && echo "started (raw_tp_mode=$raw_tp_mode)" || echo "not started")"
+	echo "  Debug Stats          : $([ "$DEBUG_STATS" = "1" ] && echo "Enabled" || echo "Disabled")"
 
 	# Display transport-specific configuration
 	if [ "$IF_TYPE" = "spi" ]; then

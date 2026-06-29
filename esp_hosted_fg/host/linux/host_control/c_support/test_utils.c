@@ -42,6 +42,58 @@
 /* Global network information structures */
 network_info_t sta_network = {0};
 network_info_t ap_network = {0};
+/* Station-connect result, set by the event callback. */
+volatile int g_sta_conn_result = STA_CONN_PENDING;
+static bool g_run_dhcp_client;
+
+/* Optional helper: wait up to timeout_sec for the connect event so the demo
+ * doesn't exit and leave ethsta0 dangling. Returns STA_CONN_*. */
+int test_wait_sta_connect(int timeout_sec)
+{
+	int waited_ms = 0;
+	while (g_sta_conn_result == STA_CONN_PENDING && waited_ms < timeout_sec * 1000) {
+		usleep(100 * 1000);
+		waited_ms += 100;
+	}
+	return g_sta_conn_result;
+}
+
+void test_set_run_dhcp_client(bool enable)
+{
+	g_run_dhcp_client = enable;
+}
+
+static void start_dhcp_client(void)
+{
+	int ret;
+
+	ret = system("sh -c 'PATH=/sbin:/usr/sbin:/bin:/usr/bin; "
+			"if command -v dhclient >/dev/null 2>&1; then "
+			"dhclient -r ethsta0 >/dev/null 2>&1 || true; "
+			"nohup dhclient -v ethsta0 >/tmp/esp_hosted_dhclient.log 2>&1 & "
+			"elif command -v udhcpc >/dev/null 2>&1; then "
+			"pkill -f \"udhcpc .*ethsta0\" >/dev/null 2>&1 || true; "
+			"nohup udhcpc -i ethsta0 >/tmp/esp_hosted_dhclient.log 2>&1 & "
+			"elif command -v dhcpcd >/dev/null 2>&1; then "
+			"dhcpcd -k ethsta0 >/dev/null 2>&1 || true; "
+			"nohup dhcpcd ethsta0 >/tmp/esp_hosted_dhclient.log 2>&1 & "
+			"elif command -v nmcli >/dev/null 2>&1; then "
+			"nohup nmcli dev connect ethsta0 >/tmp/esp_hosted_dhclient.log 2>&1 & "
+			"else exit 127; fi'");
+	if (ret)
+		printf("Failed to start DHCP client on ethsta0, ret=%d\n", ret);
+	else
+		printf("Started DHCP client on ethsta0\n");
+}
+
+static void stop_dhcp_client(void)
+{
+	system("sh -c 'PATH=/sbin:/usr/sbin:/bin:/usr/bin; "
+			"dhclient -r ethsta0 >/dev/null 2>&1 || true; "
+			"pkill -f \"udhcpc .*ethsta0\" >/dev/null 2>&1 || true; "
+			"dhcpcd -k ethsta0 >/dev/null 2>&1 || true; "
+			"nmcli dev disconnect ethsta0 >/dev/null 2>&1 || true'");
+}
 
 /* Global network status tracking */
 static bool interface_down_printed = false;
@@ -174,16 +226,20 @@ static int ctrl_app_event_callback(ctrl_cmd_t *app_event) {
 				get_timestamp(ts, MIN_TIMESTAMP_STR_SIZE), p_e->ssid,
 				p_e->bssid, p_e->channel, p_e->authmode, p_e->aid);
 			if (!test_is_network_split_on()) {
-				PRINT_IF(!connected_printed, "Network iface 'ethsta0' Up! You may run 'dhclient -v ethsta0' to get IP address\n\n");
+				if (!g_run_dhcp_client)
+					PRINT_IF(!connected_printed, "Network iface 'ethsta0' Up! You may run 'dhclient -v ethsta0' to get IP address\n\n");
 			}
 			disconnected_printed = false;
 			connected_printed = true;
 			if (sta_network.mac_addr[0] != '\0') {
 				up_sta_netdev(&sta_network);
+				if (!test_is_network_split_on() && g_run_dhcp_client)
+					start_dhcp_client();
 			} else {
 				printf("Interface ethsta0 not made up, as MAC is not set\n");
 				printf("You may consider calling 'test_station_mode_get_mac_addr(sta_network.mac_addr);' to set the STA MAC before\n");
 			}
+			g_sta_conn_result = STA_CONN_CONNECTED;
 			break;
 		} case CTRL_EVENT_STATION_DISCONNECT_FROM_AP: {
 			event_sta_disconn_t *p_e =  &app_event->u.e_sta_disconn;
@@ -193,10 +249,13 @@ static int ctrl_app_event_callback(ctrl_cmd_t *app_event) {
 				p_e->bssid, p_e->rssi);
 			if (!test_is_network_split_on()) {
 				PRINT_IF(!disconnected_printed, "Network iface 'ethsta0' Down! You may 'killall dhclient' to stop dhclient process\n\n");
+				if (g_run_dhcp_client)
+					stop_dhcp_client();
 			}
 			disconnected_printed = true;
 			connected_printed = false;
 			down_sta_netdev(&sta_network);
+			g_sta_conn_result = STA_CONN_DISCONNECTED;
 			break;
 		} case CTRL_EVENT_STATION_CONNECTED_TO_ESP_SOFTAP: {
 			event_softap_sta_conn_t *p_e = &app_event->u.e_softap_sta_conn;

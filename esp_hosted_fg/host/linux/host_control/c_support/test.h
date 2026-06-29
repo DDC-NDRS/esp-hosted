@@ -70,6 +70,12 @@ int test_ota_write(uint8_t* ota_data, uint32_t ota_data_len);
 int test_ota_end(void);
 int register_event_callbacks(void);
 int unregister_event_callbacks(void);
+
+/* STA connect result, set by the event callback. */
+enum { STA_CONN_PENDING = 0, STA_CONN_CONNECTED, STA_CONN_DISCONNECTED };
+extern volatile int g_sta_conn_result;
+int test_wait_sta_connect(int timeout_sec); /* optional blocking wait; returns STA_CONN_* */
+void test_set_run_dhcp_client(bool enable);
 int test_config_heartbeat(void);
 int test_disable_heartbeat(void);
 int test_disable_heartbeat_async(void);
