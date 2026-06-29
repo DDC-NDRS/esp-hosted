@@ -129,7 +129,7 @@ void esp_hci_rx(struct esp_adapter *adapter, struct sk_buff *skb)
 	if (ret) {
 		esp_err("Failed to process HCI frame: %d\n", ret);
 		hdev->stat.err_rx++;
-		dev_kfree_skb_any(skb);
+		/* hci_recv_frame() owns/frees skb on all paths; don't double-free */
 	} else {
 		esp_hci_update_rx_counter(hdev, *type, skb->len);
 	}

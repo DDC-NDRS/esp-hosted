@@ -40,6 +40,10 @@ ifeq ($(CONFIG_TEST_RAW_TP), y)
 	EXTRA_CFLAGS += -DCONFIG_TEST_RAW_TP
 endif
 
+ifeq ($(CONFIG_DEBUG_STATS), y)
+	EXTRA_CFLAGS += -DESP_DEBUG_STATS
+endif
+
 ifeq ($(CONFIG_BT_ENABLED), y)
 	EXTRA_CFLAGS += -DCONFIG_BT_ENABLED
 	module_objects += esp_bt.o

@@ -105,6 +105,9 @@ struct pkt_stats_t {
 	uint32_t hs_bus_sta_in;
 	uint32_t hs_bus_sta_out;
 	uint32_t hs_bus_sta_fail;
+	uint32_t hs_bus_ap_out;
+	uint32_t hs_bus_ap_fail;
+	uint32_t wifi_tx_retries;
 	uint32_t serial_rx;
 	uint32_t serial_tx_total;
 	uint32_t serial_tx_evt;
@@ -123,6 +126,11 @@ extern struct pkt_stats_t pkt_stats;
 
 void create_debugging_tasks(void);
 uint8_t debug_get_raw_tp_conf(void);
+
+#if TEST_RAW_TP
+/* Start raw-TP on host command (cmd = ESP_PRIV_CMD_RAW_TP_*). */
+void process_raw_tp_cmd(uint8_t cmd);
+#endif
 
 /* Add these declarations before the macros */
 

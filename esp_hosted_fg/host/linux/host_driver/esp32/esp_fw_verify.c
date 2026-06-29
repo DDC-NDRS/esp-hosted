@@ -46,6 +46,23 @@ int check_esp_version(struct fw_version *ver)
 
 	esp_info("Driver supports Firmware version: %s\n", RELEASE_VERSION);
 	esp_info("ESP Firmware version: %s\n", version_str);
+
+	/* A major-version change is a breaking wire-protocol boundary (FG 1->2:
+	 * SDIO coalescing + larger transport buffers). Treat it as fatal for any
+	 * check mode except an explicit FW_CHECK_OFF override, and tell the user
+	 * which side to update. */
+	if (fw_check_type != FW_CHECK_OFF && ver->major1 != PROJECT_VERSION_MAJOR_1) {
+		if (ver->major1 > PROJECT_VERSION_MAJOR_1)
+			esp_err("Incompatible firmware: ESP %s is NEWER than host driver %s "
+					"(major version). Update the host driver (esp_hosted) to match.\n",
+					version_str, RELEASE_VERSION);
+		else
+			esp_err("Incompatible firmware: ESP %s is OLDER than host driver %s "
+					"(major version). Update/reflash the ESP firmware to match.\n",
+					version_str, RELEASE_VERSION);
+		return -1;
+	}
+
 	if (fw_check_type == FW_CHECK_STRICT) {
 		if (strncmp(RELEASE_VERSION, version_str, strlen(version_str)) != 0) {
 			esp_err("Incompatible ESP firmware release detected. Please use correct ESP-Hosted branch/compatible release\n");

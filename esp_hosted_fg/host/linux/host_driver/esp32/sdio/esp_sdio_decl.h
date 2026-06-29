@@ -42,7 +42,28 @@
 #define ESP_SLAVE_LEN_MASK             0xFFFFF
 #define ESP_BLOCK_SIZE                 512
 #define ESP_RX_BYTE_MAX                0x100000
-#define ESP_RX_BUFFER_SIZE             1536
+/*
+ * ESP_RX_BUFFER_SIZE — per slave-recv-buffer size and the SDIO flow-control
+ * credit unit. MUST equal the slave's MAX_TRANSPORT_BUF_SIZE (interface.h) or
+ * credit accounting breaks; it also bounds the host->slave aggregate.
+ *
+ * Value is the max SDIO CMD53 payload per transfer, sized from two HW limits:
+ *  1) ESP SDIO slave DMA descriptor: size and length are 14-bit fields
+ *     (sdio_slave_ll_desc_t on C5/C6/C61), so one descriptor covers at most
+ *     2^14 - 1 = 16383 bytes. (Classic ESP32 is 12-bit.)
+ *  2) SDIO block mode (ESP_BLOCK_SIZE = 512): CMD53 block transfers must be
+ *     multiples of 512 bytes.
+ * Largest 512-byte-aligned size that fits one descriptor:
+ *   floor(16383 / 512) = 31 blocks; 31 * 512 = 15872
+ *   (32 * 512 = 16384 exceeds the 14-bit limit).
+ */
+#define ESP_RX_BUFFER_SIZE             15872
+/* Host->slave TX aggregation: pack several [header|payload] frames (each
+ * 4-byte aligned) into one CMD53 write. The aggregate must fit one slave recv
+ * buffer, so it is bounded by ESP_RX_BUFFER_SIZE. Small data packets flush
+ * immediately (latency bypass) instead of waiting to fill the buffer. */
+#define ESP_HOST_TX_AGGR_SIZE          ESP_RX_BUFFER_SIZE
+#define ESP_HOST_TX_LATENCY_BYPASS_SIZE 256
 
 #define ESP_TX_BUFFER_MASK             0xFFF
 #define ESP_TX_BUFFER_MAX              0x1000
@@ -95,10 +116,34 @@ struct esp_sdio_context {
 	struct esp_adapter     *adapter;
 	struct sdio_func       *func;
 	struct sk_buff_head    tx_q[MAX_PRIORITY_QUEUES];
+	struct sk_buff_head    rx_q;
 	wait_queue_head_t      tx_wq;
 	u32                    rx_byte_count;
+	u32                    rx_init_len;    /* bytes pending at probe time (stale from prev session) */
 	u32                    tx_buffer_count;
 	u32                    sdio_clk_mhz;
+	u8                     aggr_flags;  /* slave-advertised ESP_AGGR_CFG_* bits; 0 = old slave */
+	/* H2E (host->slave) aggregation size = slave recv buffer; host TX-aggregation
+	 * + credit limit. From ESP_PRIV_AGGR_CONFIG; 0 = TLV absent → ESP_RX_BUFFER_SIZE. */
+	u32                    slave_rx_buf_size;
+	/* E2H (slave->host) aggregation size advertised by slave; informational today
+	 * (RX path reads the per-transfer length), reserved for future RX sizing. */
+	u32                    e2h_aggr_size;
+	/* Negotiated aggregation modes from ESP_PRIV_RX_BUF_CONFIG (0 = simple/
+	 * non-streaming). Stored so future size/mode tuning can act on them. */
+	u8                     h2e_mode;
+	u8                     e2h_mode;
+	/* Combined reg read: the ISR reads INT_ST..PACKET_LEN in one CMD53 and
+	 * stashes the raw length here so the first read_packet skips its own
+	 * PACKET_LEN read. Set in ISR, consumed once in esp_get_len_from_slave
+	 * (WRITE_ONCE/READ_ONCE). */
+	bool                   prefetch_len_valid;
+	u32                    prefetch_len_raw;
+	/* DMA-safe SDIO reg buffers allocated once at probe (not per IRQ/packet):
+	 * reg_buf = ISR INT_ST..PACKET_LEN read (3 words); rx_len_buf = per-packet
+	 * PACKET_LEN read (1 word). */
+	u32                    *reg_buf;
+	u32                    *rx_len_buf;
 };
 
 int generate_slave_intr(struct esp_sdio_context *context, u8 data);

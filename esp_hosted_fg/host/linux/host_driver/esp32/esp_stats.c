@@ -21,6 +21,7 @@
 #include "esp_utils.h"
 #include "esp_stats.h"
 #include "esp_api.h"
+#include "esp_if.h"	/* struct esp_if_ops (raw-TP uses adapter->if_ops->alloc_skb) */
 
 #if TEST_RAW_TP
 
@@ -42,6 +43,10 @@ static struct completion traffic_open;
 static void log_raw_tp_stats_timer_cb(struct timer_list *timer)
 {
 	unsigned long actual_bandwidth = 0;
+
+	/* Don't re-arm once cleanup cleared the flag (else timer outlives unload). */
+	if (!log_raw_tp_stats_timer_running)
+		return;
 
 	mod_timer(&log_raw_tp_stats_timer, jiffies + msecs_to_jiffies(1000));
 	actual_bandwidth = BYTES_TO_KBITS(test_raw_tp_len);
@@ -65,6 +70,8 @@ static int raw_tp_tx_process(void *data)
 	pad_len = sizeof(struct esp_payload_header);
 	total_len = TEST_RAW_TP__BUF_SIZE + pad_len;
 	pad_len += SKB_DATA_ADDR_ALIGNMENT - (total_len % SKB_DATA_ADDR_ALIGNMENT);
+	/* recompute so the skb holds header(pad_len) + payload, not just payload */
+	total_len = TEST_RAW_TP__BUF_SIZE + pad_len;
 
 	msleep(2000);
 
@@ -72,14 +79,14 @@ static int raw_tp_tx_process(void *data)
 
 		if (esp_is_tx_queue_paused()) {
 
-			tx_skb = adapter->if_ops->alloc_skb(TEST_RAW_TP__BUF_SIZE);
+			tx_skb = adapter->if_ops->alloc_skb(total_len);
 			if (!tx_skb) {
 				esp_err("%u esp_alloc_skb failed\n", __LINE__);
 				msleep(10);
 				continue;
 			}
-			memset(tx_skb->data, 0, TEST_RAW_TP__BUF_SIZE);
-			tx_skb->len = TEST_RAW_TP__BUF_SIZE;
+			skb_put(tx_skb, total_len);
+			memset(tx_skb->data, 0, total_len);
 
 			payload_header = (struct esp_payload_header *) tx_skb->data;
 			memset(payload_header, 0, pad_len);
@@ -88,6 +95,12 @@ static int raw_tp_tx_process(void *data)
 			payload_header->if_num = 0;
 			payload_header->len = cpu_to_le16(TEST_RAW_TP__BUF_SIZE);
 			payload_header->offset = cpu_to_le16(pad_len);
+
+			if (adapter->capabilities & ESP_CHECKSUM_ENABLED) {
+				payload_header->checksum =
+					cpu_to_le16(compute_checksum(tx_skb->data,
+							TEST_RAW_TP__BUF_SIZE + pad_len));
+			}
 
 			ret = esp_send_packet(esp_get_adapter(), tx_skb);
 			if(!ret)
@@ -151,10 +164,10 @@ void test_raw_tp_cleanup(void)
 	int ret = 0;
 
 	if (log_raw_tp_stats_timer_running) {
-		ret = del_timer(&log_raw_tp_stats_timer);
-		if (!ret) {
-			log_raw_tp_stats_timer_running = 0;
-		}
+		/* Clear flag first (stops cb re-arm), then sync-delete: del_timer()
+		 * alone races a self-re-arming timer -> can fire after unload. */
+		log_raw_tp_stats_timer_running = 0;
+		del_timer_sync(&log_raw_tp_stats_timer);
 		raw_tp_timer_count = 0;
 	}
 

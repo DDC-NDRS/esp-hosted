@@ -30,6 +30,11 @@
 #include "stats.h"
 #include "esp_timer.h"
 #include "esp_fw_version.h"
+#include "host_power_save.h"
+
+/* datapath gate (owned by the coprocessor app); the SPI write path checks it
+ * below if_ops->write so send_to_host_queue() stays transport-agnostic. */
+extern volatile uint8_t datapath;
 
 // de-assert HS signal on CS, instead of at end of transaction
 #if defined(CONFIG_ESP_SPI_DEASSERT_HS_ON_CS)
@@ -789,6 +794,7 @@ static interface_handle_t * esp_spi_init(void)
 static int32_t esp_spi_write(interface_handle_t *handle, interface_buffer_handle_t *buf_handle)
 {
 	int32_t total_len = 0;
+	int32_t ret = ESP_FAIL;
 	struct esp_payload_header *header;
 	interface_buffer_handle_t tx_buf_handle = {0};
 
@@ -796,13 +802,32 @@ static int32_t esp_spi_write(interface_handle_t *handle, interface_buffer_handle
 	if (!handle || !buf_handle || !buf_handle->payload) {
 		ESP_LOGE(TAG, "Invalid args - handle:%p buf:%p payload:%p",
 				handle, buf_handle, buf_handle ? buf_handle->payload : NULL);
-		return ESP_FAIL;
+		goto out;
+	}
+
+	/* SPI transport owns buf_handle from here: every exit frees it at 'out'
+	 * (callee-owns contract, matching SDIO). Datapath gate + host power-save
+	 * were relocated here from the old process_tx_pkt so the app layer
+	 * (send_to_host_queue) stays transport-agnostic. */
+	if (!datapath) {
+		ESP_LOGD(TAG, "Data path stopped");
+		usleep(100*1000);
+		goto out;
+	}
+
+	if (is_host_power_saving() && is_host_wakeup_needed(buf_handle)) {
+		ESP_LOGI(TAG, "Host sleeping, trigger wake-up");
+		if (!wakeup_host(portMAX_DELAY)) {
+			ESP_LOGI(TAG, "Host wakeup failed, drop packet");
+			goto out;
+		}
+		buf_handle->flag |= FLAG_WAKEUP_PKT;
 	}
 
 	/* Length validation */
 	if (!buf_handle->payload_len || buf_handle->payload_len > (SPI_BUFFER_SIZE-sizeof(struct esp_payload_header))) {
 		ESP_LOGE(TAG, "Invalid payload length:%d", buf_handle->payload_len);
-		return ESP_FAIL;
+		goto out;
 	}
 
 	/* Calculate total length */
@@ -815,14 +840,14 @@ static int32_t esp_spi_write(interface_handle_t *handle, interface_buffer_handle
 
 	if (total_len > SPI_BUFFER_SIZE) {
 		ESP_LOGE(TAG, "Total length %" PRId32 " exceeds max %d", total_len, SPI_BUFFER_SIZE);
-		return ESP_FAIL;
+		goto out;
 	}
 
 	/* Allocate and validate TX buffer */
 	tx_buf_handle.payload = spi_buffer_tx_alloc(MEMSET_NOT_REQUIRED);
 	if (!tx_buf_handle.payload) {
 		ESP_LOGE(TAG, "TX buffer allocation failed");
-		return ESP_FAIL;
+		goto out;
 	}
 
 	/* Setup header */
@@ -870,7 +895,16 @@ static int32_t esp_spi_write(interface_handle_t *handle, interface_buffer_handle
 
 	set_dataready_gpio();
 
-	return tx_buf_handle.payload_len;
+	ret = tx_buf_handle.payload_len;
+
+out:
+	/* Callee-owns: release the source buffer on every exit path (the payload
+	 * was copied into the SPI DMA buffer above, so this is safe post-copy). */
+	if (buf_handle && buf_handle->free_buf_handle && buf_handle->priv_buffer_handle) {
+		buf_handle->free_buf_handle(buf_handle->priv_buffer_handle);
+		buf_handle->priv_buffer_handle = NULL;
+	}
+	return ret;
 }
 
 static void IRAM_ATTR esp_spi_read_done(void *handle)

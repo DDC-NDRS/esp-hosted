@@ -79,7 +79,10 @@ typedef struct {
 #if CONFIG_ESP_SPI_HOST_INTERFACE
 #define MAX_TRANSPORT_BUF_SIZE 1600
 #elif CONFIG_ESP_SDIO_HOST_INTERFACE
-#define MAX_TRANSPORT_BUF_SIZE 1536
+/* host->slave recv buffer = aggregation depth (sets host->ESP/WiFi-TX). MUST
+ * match host ESP_RX_BUFFER_SIZE (esp_sdio_decl.h) or credit accounting breaks.
+ * SDIO-only: SPI keeps the small per-transfer buffer (no aggregation/credit). */
+#define MAX_TRANSPORT_BUF_SIZE 15872
 #endif
 
 #define BSSID_BYTES_SIZE       6
