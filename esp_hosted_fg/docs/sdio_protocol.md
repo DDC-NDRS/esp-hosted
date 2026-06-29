@@ -5,8 +5,8 @@ This section explains the SDIO communication protocol between a host and ESP per
 
 ### 1.1 SDIO transport layer
 
-| Supported Targets | ESP32 | ESP32-C6 | ESP32-C5 |
-| ----------------- | ----- | -------- | -------- |
+| Supported Targets | ESP32 | ESP32-C6/C61 | ESP32-C5 |
+| ----------------- | ----- | ------------ | -------- |
 
 ESP peripheral advertises 2 SDIO functions. ESP-Hosted solution is implemented on function 1. Though function 2 is advertised, it is not in use.
 

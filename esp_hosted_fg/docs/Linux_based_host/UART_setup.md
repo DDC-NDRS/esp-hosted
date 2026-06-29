@@ -1,7 +1,7 @@
 # Bluetooth/BLE connectivity Setup over UART
 
-| Supported Chipsets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-S3 | ESP32-C6 | ESP32-C5 | ESP32-S2 |
-| ------------------ | :---: | :------: | :------: | :------: | :------: | :------: | :------: |
+| Supported Chipsets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-S3 | ESP32-C6/C61 | ESP32-C5 | ESP32-S2 |
+| ------------------ | :---: | :------: | :------: | :------: | :----------: | :------: | :------: |
 | 4 line UART        | T     | NT        | T        | T        | NT        | NT        | T        |
 | 2 line UART        | NT     | T        | NT        | NT        | T        | T        | NT        |
 
