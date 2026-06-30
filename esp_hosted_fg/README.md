@@ -49,8 +49,8 @@ ESP-Hosted-FG solution provides following WLAN and BT/BLE features to the host:
 
 ESP-Hosted-FG solution is supported on following ESP boards:
 
-| Supported Targets | ESP32 | ESP32-S2 | ESP32-S3 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | -------- | -------- |
+| Supported Targets | ESP32 | ESP32-S2 | ESP32-S3 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6/C61 |
+| ----------------- | ----- | -------- | -------- | -------- | -------- | -------- | ------------ |
 
 ### 1.3 Supported Hosts
 
@@ -88,8 +88,8 @@ The below table explains which feature is supported on which transport interface
 | ESP Chipset | Transport options | Linux Features supported |
 | -------: | :-------: | :-------: |
 | <a>![ESP32](docs/icons/esp32.svg)</a> | <a>![sdio_only](docs/icons/sdio_only.svg)</a><br/><a>![sdio_uart](docs/icons/sdio_uart.svg)</a><br/><a>![spi_only](docs/icons/spi_only.svg)</a><br/><a>![spi_uart](docs/icons/spi_uart.svg)</a> | <a>![Wi-Fi](docs/icons/wifi.svg)</a><br/><a>![Classic_BT](docs/icons/ClassicBT.svg)</a><br/><a>![BLE4.2](docs/icons/BLE4.2.svg)</a> |
-| <a>![ESP32-C6](docs/icons/esp32c6.svg)</a> | <a>![sdio_only](docs/icons/sdio_only.svg)</a><br/><a>![sdio_uart](docs/icons/sdio_uart.svg)</a><br/><a>![spi_only](docs/icons/spi_only.svg)</a><br/><a>![spi_uart](docs/icons/spi_uart.svg)</a> | <a>![Wi-Fi-6](docs/icons/wifi_6.svg)</a><br/><a>![BLE5.0](docs/icons/BLE5.3.svg)</a> |
-| <a>![ESP32-C5](docs/icons/esp32c5.svg)</a> | <a>![spi_only](docs/icons/spi_only.svg)</a><br/><a>![spi_uart](docs/icons/spi_uart.svg)</a><br/> | <a>![Wi-Fi-6](docs/icons/wifi_6.svg)</a><br/><a>![Wi-Fi Dual band](docs/icons/wifi_dual_band.svg)</a><br/><a>![BLE5.0](docs/icons/BLE5.3.svg)</a> |
+| <a>![ESP32-C6/C61](docs/icons/esp32c6.svg)</a> | <a>![sdio_only](docs/icons/sdio_only.svg)</a><br/><a>![sdio_uart](docs/icons/sdio_uart.svg)</a><br/><a>![spi_only](docs/icons/spi_only.svg)</a><br/><a>![spi_uart](docs/icons/spi_uart.svg)</a> | <a>![Wi-Fi-6](docs/icons/wifi_6.svg)</a><br/><a>![BLE5.0](docs/icons/BLE5.3.svg)</a> |
+| <a>![ESP32-C5](docs/icons/esp32c5.svg)</a> | <a>![sdio_only](docs/icons/sdio_only.svg)</a><br/><a>![sdio_uart](docs/icons/sdio_uart.svg)</a><br/><a>![spi_only](docs/icons/spi_only.svg)</a><br/><a>![spi_uart](docs/icons/spi_uart.svg)</a> | <a>![Wi-Fi-6](docs/icons/wifi_6.svg)</a><br/><a>![Wi-Fi Dual band](docs/icons/wifi_dual_band.svg)</a><br/><a>![BLE5.0](docs/icons/BLE5.3.svg)</a> |
 | <a>![ESP32-S2](docs/icons/esp32s2.svg)</a> | <a>![spi_only](docs/icons/spi_only.svg)</a> | <a>![Wi-Fi](docs/icons/wifi.svg)</a> |
 | <a>![ESP32-C3](docs/icons/esp32c3.svg)</a><br/><a>![ESP32-C2](docs/icons/esp32c2.svg)</a><br/><a>![ESP32-S3](docs/icons/esp32s3.svg)</a> | <a>![spi_only](docs/icons/spi_only.svg)</a><br/><a>![spi_uart](docs/icons/spi_uart.svg)</a> | <a>![Wi-Fi](docs/icons/wifi.svg)</a><br/><a>![BLE5.0](docs/icons/BLE5.0.svg)</a> |
 
@@ -99,7 +99,6 @@ The below table explains which feature is supported on which transport interface
 > - Suggested to use latest stable bluez version.
 > - bluez 5.45 on-wards BLE 5.0 HCI commands are supported.
 > - BLE 5.0 has backward compatibility of BLE 4.2.
-> - ESP32-C5 SDIO and SDIO+UART support is coming soon!
 
 ##### 1.5.2 MCU Host
 
@@ -271,8 +270,129 @@ Below document explains the APIs provided for MCU based ESP-Hosted-FG solution
 * [API's for MCU based host](docs/MCU_based_host/mcu_api.md)
 
 # 5. Throughput performance
-* Station & Soft-AP both the Wi-Fi modes support both, 20 MHz & 40 MHz bandwidth
-* Throughput performance is measured with iperf inside the RF shielded box
-* Following are ESP-Hosted-FG iperf throughput numbers for Wi-Fi (station mode - 20MHz), considering common use-case
 
-![alt text](docs/esp_hosted_performance.png "ESP Hosted performance matrix")
+### 5.1 Raw transport throughput
+
+Pure host&harr;ESP SDIO bus throughput (no Wi-Fi) — the transport ceiling. See the [RAW throughput guide](docs/Linux_based_host/Raw_TP_Testing.md). ESP32-C5, SDIO bus ~41.67 MHz (Raspberry Pi 4B).
+
+<table align="center">
+<thead>
+<tr>
+<th align="center">ESP device</th><th align="center">Transport</th><th align="center">E2H — ESP&rarr;Host<br/>(Mbps)</th><th align="center">H2E — Host&rarr;ESP<br/>(Mbps)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">ESP32-C5</td>
+<td align="center">SDIO</td>
+<td align="center">91</td>
+<td align="center">96</td>
+</tr>
+</tbody>
+</table>
+
+### 5.2 Wi-Fi station throughput
+
+ESP-Hosted-FG `iperf` numbers (Wi-Fi station mode). `Tx` = upload (host&rarr;AP), `Rx` = download (AP&rarr;host).
+
+**Test setup:**
+
+
+```mermaid
+---
+title: ESP-Hosted-FG shield box test environment
+config:
+  flowchart:
+    curve: basis
+    nodeSpacing: 60
+    rankSpacing: 40
+---
+flowchart TB
+    ipAP["192.168.1.1"]:::ip
+    ipDUT["192.168.1.2 · data<br/>10.0.0.3 · control"]:::ip
+    ipHost["192.168.1.88 · test<br/>10.0.0.1 · control"]:::ip
+    ipDev["10.0.0.2"]:::ip
+    subgraph SB["Shield Box"]
+        AP["📶 AP / Router"]
+        subgraph FG["ESP-Hosted-FG setup"]
+            direction LR
+            C6["ESP32-C6<br/>Co-processor"]
+            DUT["Linux DUT<br/>iperf client / server"]
+            C6 ---|"SDIO=50MHz"| DUT
+        end
+        AP -.-|"Wi-Fi"| C6
+        HOST["AP-backend host<br/>iperf client / server"]
+        AP ===|"LAN cable"| HOST
+        SW["Control switch"]
+        HOST ---|"control"| SW
+        DUT ---|"control"| SW
+        DUT <-.->|"iperf Tx/Rx"| HOST
+    end
+    TESTER["Tester laptop"]
+    SW ---|"control"| TESTER
+    ipAP -.- AP
+    ipDUT -.- DUT
+    ipHost -.- HOST
+    ipDev -.- TESTER
+    subgraph LG[" "]
+        direction LR
+        LG1(( )) ---|"data"| LG2(( )) ---|"control"| LG3(( ))
+    end
+    style SB fill:#fff7ec,stroke:#e8a33d,color:#333
+    style FG fill:#efeaf8,stroke:#8a7bbd,color:#333
+    style LG fill:none,stroke:none
+    classDef node fill:#ffffff,stroke:#99aabb,color:#111
+    classDef ip fill:none,stroke:none,color:#555
+    class AP,C6,DUT,HOST,TESTER,SW node
+    class LG1,LG2,LG3 ip
+    linkStyle 0,1,2,11 stroke:#e8762d,stroke-width:2.5px
+    linkStyle 3,4,6,12 stroke:#0e9488,stroke-width:2px
+    linkStyle 5 stroke:#e8762d,stroke-width:2px,stroke-dasharray:2 2
+    linkStyle 7,8,9,10 stroke:#cccccc,stroke-width:1px,stroke-dasharray:2 2
+    TESTER ~~~ LG
+```
+
+
+<table align="center">
+<thead>
+<tr>
+<th align="center">ESP device</th><th align="center">Transport</th><th align="center">TCP Tx<br/>(Mbps)</th><th align="center">TCP Rx<br/>(Mbps)</th><th align="center">UDP Tx<br/>(Mbps)</th><th align="center">UDP Rx<br/>(Mbps)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td rowspan=4 align="center">ESP32-C5</td>
+<td align="center">SDIO 2.4 GHz (11ax 20MHz)</td>
+<td align="center">33.6</td>
+<td align="center">39.2</td>
+<td align="center">39.9</td>
+<td align="center">48.5</td>
+</tr>
+<tr>
+<td align="center">SDIO 2.4 GHz (11n 40MHz)</td>
+<td align="center">36.2</td>
+<td align="center">39.6</td>
+<td align="center">39.8</td>
+<td align="center">47.5</td>
+</tr>
+<tr>
+<td align="center">SDIO 5 GHz (11ax 20MHz)</td>
+<td align="center">55.1</td>
+<td align="center">54.0</td>
+<td align="center">64.0</td>
+<td align="center">70.5</td>
+</tr>
+<tr>
+<td align="center">SDIO 5 GHz (11n 40MHz)</td>
+<td align="center">79.6</td>
+<td align="center">59.9</td>
+<td align="center">89.0</td>
+<td align="center">86.7</td>
+</tr>
+</tbody>
+</table>
+
+> [!NOTE]
+> - **Open-air** (not RF-shielded): ESP32-C5, 2.4 GHz ch11 + 5 GHz ch157, single AP, wired iperf backend. 2.4 GHz is congestion/PHY-limited (HT40 ≈ HT20).
+> - **SDIO clock**: Raspberry Pi 4B tops out at ~41.67 MHz even when 50 MHz is requested; other Linux hosts (e.g. i.MX) reach the full 50 MHz.
+> - **HT40** (40 MHz) needs 802.11n (`11an`) on a **non-DFS** channel; DFS channels negotiate HT20 (see [SDIO setup](docs/Linux_based_host/SDIO_setup.md)).

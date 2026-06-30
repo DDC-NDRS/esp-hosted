@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021-2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -75,7 +75,8 @@ static const char TAG[] = "fg_slave";
 #define TO_HOST_QUEUE_SIZE               10
 
 #define ETH_DATA_LEN                     1500
-#define MAX_WIFI_STA_TX_RETRY            2
+#define MAX_WIFI_STA_TX_RETRY            8
+#define WIFI_TX_RETRY_DELAY_MS           1
 
 
 
@@ -254,6 +255,10 @@ esp_err_t wlan_sta_rx_callback(void *buffer, uint16_t len, void *eb)
 		case SLAVE_LWIP_BRIDGE:
 			/* Send to local LWIP */
 			ESP_LOGV(TAG, "slave packet");
+			if (!slave_sta_netif) {
+				ESP_LOGW(TAG, "slave_sta_netif not init, drop slave packet");
+				goto DONE;
+			}
 			esp_netif_receive(slave_sta_netif, buffer, len, eb);
 #if ESP_PKT_STATS
 			pkt_stats.sta_slave_lwip_out++;
@@ -263,19 +268,30 @@ esp_err_t wlan_sta_rx_callback(void *buffer, uint16_t len, void *eb)
 		case BOTH_LWIP_BRIDGE:
 			ESP_LOGV(TAG, "slave & host packet");
 
-			void * copy_buff = malloc(len);
-			assert(copy_buff);
-			memcpy(copy_buff, buffer, len);
-
-			/* slave LWIP */
-			esp_netif_receive(slave_sta_netif, buffer, len, eb);
-
-			ESP_LOGV(TAG, "slave & host packet");
+			/* Allocate host copy only when datapath is open. */
+			void *copy_buff = NULL;
 			if (datapath) {
-				/* Host LWIP, free up wifi buffers */
+				copy_buff = malloc(len);
+				if (copy_buff)
+					memcpy(copy_buff, buffer, len);
+				else
+					ESP_LOGW(TAG, "no mem for host copy, slave-only this packet");
+			}
+
+			/* slave netif takes ownership of eb */
+			if (!slave_sta_netif) {
+				ESP_LOGW(TAG, "slave_sta_netif not init, drop slave part");
+				esp_wifi_internal_free_rx_buffer(eb);
+			} else {
+				esp_netif_receive(slave_sta_netif, buffer, len, eb);
+			}
+
+			if (copy_buff) {
 				populate_buff_handle(&buf_handle, ESP_STA_IF, copy_buff, len, free, copy_buff, 0, 0, 0);
-				if (unlikely(send_to_host_queue(&buf_handle, PRIO_Q_OTHERS)))
-					goto DONE;
+				if (unlikely(send_to_host_queue(&buf_handle, PRIO_Q_OTHERS))) {
+					free(copy_buff);
+					return ESP_OK;
+				}
 
 			#if ESP_PKT_STATS
 				pkt_stats.sta_sh_in++;
@@ -301,43 +317,7 @@ DONE:
 	return ESP_OK;
 }
 
-static void process_tx_pkt(interface_buffer_handle_t *buf_handle)
-{
-	int host_awake = 1;
-
-	/* Check if data path is not yet open */
-	if (!datapath) {
-		/* Post processing */
-		if (buf_handle->free_buf_handle && buf_handle->priv_buffer_handle) {
-			buf_handle->free_buf_handle(buf_handle->priv_buffer_handle);
-			buf_handle->priv_buffer_handle = NULL;
-		}
-		ESP_LOGD(TAG, "Data path stopped");
-		usleep(100*1000);
-		return;
-	}
-	if (if_context && if_context->if_ops && if_context->if_ops->write) {
-
-		if (is_host_power_saving() && is_host_wakeup_needed(buf_handle)) {
-			ESP_LOGI(TAG, "Host sleeping, trigger wake-up");
-			ESP_HEXLOGW("Wakeup_pkt", buf_handle->payload+H_ESP_PAYLOAD_HEADER_OFFSET,
-					buf_handle->payload_len, buf_handle->payload_len);
-			host_awake = wakeup_host(portMAX_DELAY);
-			buf_handle->flag |= FLAG_WAKEUP_PKT;
-		}
-
-		if (host_awake)
-			if_context->if_ops->write(if_handle, buf_handle);
-		else
-			ESP_LOGI(TAG, "Host wakeup failed, drop packet");
-	}
-
-	/* Post processing */
-	if (buf_handle->free_buf_handle && buf_handle->priv_buffer_handle) {
-		buf_handle->free_buf_handle(buf_handle->priv_buffer_handle);
-		buf_handle->priv_buffer_handle = NULL;
-	}
-}
+/* TX ownership now lives in transport write(). */
 
 static void parse_protobuf_req(void)
 {
@@ -428,6 +408,39 @@ static void process_priv_pkt(uint8_t *payload, uint16_t payload_len)
 	}
 }
 
+/* Host->slave private command. */
+static void process_priv_command(uint8_t *payload, uint16_t payload_len)
+{
+	if (!payload || !payload_len)
+		return;
+
+#if TEST_RAW_TP
+	process_raw_tp_cmd(payload[0]);
+#else
+	ESP_LOGW(TAG, "Priv command %u ignored (raw-tp not built in)", payload[0]);
+#endif
+}
+
+/* Retry transient WiFi TX buffer exhaustion. */
+static int wifi_tx_with_retry(wifi_interface_t wifi_if, uint8_t *payload,
+		uint16_t payload_len)
+{
+	int ret = ESP_OK;
+	int retry = MAX_WIFI_STA_TX_RETRY;
+
+	do {
+		ret = esp_wifi_internal_tx(wifi_if, payload, payload_len);
+		if (ret != ESP_ERR_NO_MEM)
+			break;
+#if ESP_PKT_STATS
+		pkt_stats.wifi_tx_retries++;
+#endif
+		vTaskDelay(pdMS_TO_TICKS(WIFI_TX_RETRY_DELAY_MS));
+	} while (--retry);
+
+	return ret;
+}
+
 static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 {
 
@@ -435,7 +448,6 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 	uint8_t *payload = NULL;
 	uint16_t payload_len = 0;
 	int ret = 0;
-	int retry_wifi_tx = MAX_WIFI_STA_TX_RETRY;
 
 	header = (struct esp_payload_header *) buf_handle->payload;
 	payload = buf_handle->payload + le16toh(header->offset);
@@ -446,14 +458,7 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 
 	if (buf_handle->if_type == ESP_STA_IF && station_connected) {
 		/* Forward data to wlan driver */
-		do {
-			ret = esp_wifi_internal_tx(WIFI_IF_STA, payload, payload_len);
-			if (ret) {
-				vTaskDelay(pdMS_TO_TICKS(1));
-			}
-
-			retry_wifi_tx--;
-		} while (ret && retry_wifi_tx);
+		ret = wifi_tx_with_retry(WIFI_IF_STA, payload, payload_len);
 
 #if ESP_PKT_STATS
 		if (ret)
@@ -463,7 +468,13 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 #endif
 	} else if (buf_handle->if_type == ESP_AP_IF && softap_started) {
 		/* Forward data to wlan driver */
-		esp_wifi_internal_tx(WIFI_IF_AP, payload, payload_len);
+		ret = wifi_tx_with_retry(WIFI_IF_AP, payload, payload_len);
+#if ESP_PKT_STATS
+		if (ret)
+			pkt_stats.hs_bus_ap_fail++;
+		else
+			pkt_stats.hs_bus_ap_out++;
+#endif
 		ESP_HEXLOGV("AP_Put", payload, payload_len, 32);
 	} else if (buf_handle->if_type == ESP_SERIAL_IF) {
 #if ESP_PKT_STATS
@@ -471,7 +482,10 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 #endif
 		process_serial_rx_pkt(buf_handle->payload);
 	} else if (buf_handle->if_type == ESP_PRIV_IF) {
-		process_priv_pkt(payload, payload_len);
+		if (header->priv_pkt_type == ESP_PACKET_TYPE_COMMAND)
+			process_priv_command(payload, payload_len);
+		else
+			process_priv_pkt(payload, payload_len);
 	}
 #if defined(CONFIG_BT_ENABLED) && BLUETOOTH_HCI
 	else if (buf_handle->if_type == ESP_HCI_IF) {
@@ -536,7 +550,12 @@ static ssize_t serial_read_data(uint8_t *data, ssize_t len)
 
 int send_to_host_queue(interface_buffer_handle_t *buf_handle, uint8_t queue_type)
 {
-	process_tx_pkt(buf_handle);
+	/* write() takes ownership of buf_handle and frees it, so return OK once it
+	 * is reached (caller must not double-free); FAIL only when no transport.
+	 * queue_type is unused - the driver derives the lane from if_type. */
+	if (!if_context || !if_context->if_ops || !if_context->if_ops->write)
+		return ESP_FAIL;
+	if_context->if_ops->write(if_handle, buf_handle);
 	return ESP_OK;
 }
 
@@ -707,7 +726,8 @@ void create_slave_sta_netif(uint8_t dhcp_at_slave)
 }
 #endif
 
-#if 1
+/* Inits WiFi + STA mode + start at boot in all modes (so host RPCs don't hit
+ * WIFI_NOT_INIT); the fallback auto-connect inside is gated to network-split. */
 
 #define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
@@ -742,7 +762,7 @@ void create_slave_sta_netif(uint8_t dhcp_at_slave)
   #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
-static int fallback_to_sdkconfig_wifi_config(void)
+static int __attribute__((unused)) fallback_to_sdkconfig_wifi_config(void)
 {
 	wifi_config_t wifi_config = {
 		.sta = {
@@ -767,7 +787,7 @@ static int fallback_to_sdkconfig_wifi_config(void)
 	return ESP_OK;
 }
 
-static bool wifi_is_provisioned(void)
+static bool __attribute__((unused)) wifi_is_provisioned(void)
 {
 	wifi_config_t wifi_cfg = {0};
 
@@ -810,9 +830,11 @@ static int connect_sta(void)
 	}
 #endif
 
+#ifdef CONFIG_NETWORK_SPLIT_ENABLED
 	if (! wifi_is_provisioned()) {
 		fallback_to_sdkconfig_wifi_config();
 	}
+#endif
 
 	ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
@@ -832,7 +854,6 @@ static int connect_sta(void)
 
 	return ESP_OK;
 }
-#endif
 
 #if H_HOST_PS_ALLOWED
 
@@ -1029,9 +1050,7 @@ esp_err_t esp_hosted_coprocessor_init(void)
 			);
 #endif
 
-#if 1
 	connect_sta();
-#endif
 
 	ESP_LOGI(TAG, "bus tx locked on slave boot-up");
 
@@ -1080,4 +1099,3 @@ void app_main(void)
 #endif
 
 }
-

@@ -1,5 +1,5 @@
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-/* SPDX-License-Identifier: GPL-2.0-only OR Apache-2.0 */
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
+// SPDX-License-Identifier: GPL-2.0-only OR Apache-2.0
 
 #ifndef __ESP_NETWORK_ADAPTER__H
 #define __ESP_NETWORK_ADAPTER__H
@@ -55,6 +55,16 @@ struct esp_payload_header {
 
 #define H_ESP_PAYLOAD_HEADER_OFFSET sizeof(struct esp_payload_header)
 
+/* Maximum alignment padding required for DMA */
+#define ESP_MAX_ALIGN_PADDING           4
+
+/* Maximum offset = header size (12) + max DMA alignment padding (4) */
+#define ESP_MAX_OFFSET_SIZE             (sizeof(struct esp_payload_header) + ESP_MAX_ALIGN_PADDING)
+
+/* Validate offset: must be >= header size and <= ESP_MAX_OFFSET_SIZE */
+#define ESP_OFFSET_VALID(offset) \
+	((offset) >= sizeof(struct esp_payload_header) && (offset) <= ESP_MAX_OFFSET_SIZE)
+
 typedef enum {
 	ESP_STA_IF,
 	ESP_AP_IF,
@@ -93,11 +103,20 @@ typedef enum {
 
 typedef enum {
 	ESP_PACKET_TYPE_EVENT,
+	ESP_PACKET_TYPE_COMMAND,
 } ESP_PRIV_PACKET_TYPE;
 
 typedef enum {
 	ESP_PRIV_EVENT_INIT,
 } ESP_PRIV_EVENT_TYPE;
+
+/* Host->slave private commands carried on ESP_PRIV_IF with priv_pkt_type
+ * ESP_PACKET_TYPE_COMMAND (1-byte payload = the command code below).
+ * raw_tp_mode: 1 = Host->ESP, 2 = ESP->Host. */
+typedef enum {
+	ESP_PRIV_CMD_RAW_TP_HOST_TO_ESP = 1,
+	ESP_PRIV_CMD_RAW_TP_ESP_TO_HOST = 2,
+} ESP_PRIV_COMMAND_TYPE;
 
 typedef enum {
 	ESP_PRIV_CAPABILITY,
@@ -105,7 +124,30 @@ typedef enum {
 	ESP_PRIV_FIRMWARE_CHIP_ID,
 	ESP_PRIV_TEST_RAW_TP,
 	ESP_PRIV_FW_DATA,
+	ESP_PRIV_RX_BUF_CONFIG,
+	ESP_PRIV_CUSTOM_STR,
 } ESP_PRIV_TAG_TYPE;
+
+/* ESP_PRIV_RX_BUF_CONFIG: the slave advertises its datapath buffer sizing in the
+ * boot-up event so the host sizes its RX buffer accordingly (no hardcoded cap).
+ * Per direction: e2h = slave->host, h2e = host->slave. Sizes are in 512-byte
+ * units (uint8 -> up to ~127 KB; slave buffers are always 512 multiples). */
+enum esp_priv_transport { ESP_PRIV_TPORT_SDIO = 0, ESP_PRIV_TPORT_SPI = 1 };
+enum esp_priv_tx_mode   { ESP_PRIV_TXMODE_SW_AGGR = 0, ESP_PRIV_TXMODE_STREAM = 1,
+                          ESP_PRIV_TXMODE_PACKET = 2 };
+#define ESP_PRIV_BUF_BLOCK 512
+
+struct esp_priv_rx_buf_config {
+	uint8_t transport;              /* enum esp_priv_transport */
+	union {
+		struct {
+			uint8_t e2h_mode;       /* enum esp_priv_tx_mode (slave->host) */
+			uint8_t e2h_bufsz_512B; /* slave->host max buffer / 512 -> host RX alloc cap */
+			uint8_t h2e_mode;       /* enum esp_priv_tx_mode (host->slave) */
+			uint8_t h2e_bufsz_512B; /* host->slave recv buffer / 512 */
+		} sdio;
+	} u;
+} __attribute__((packed));
 
 struct esp_priv_event {
 	uint8_t		event_type;

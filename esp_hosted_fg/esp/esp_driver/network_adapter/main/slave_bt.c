@@ -1,17 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 //
 #include <stdint.h>
 #include <interface.h>
@@ -408,12 +396,12 @@ static void init_uart_esp32(void)
 }
 #endif /* CONFIG_IDF_TARGET_ESP32 */
 
-#if (defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32C6)) || defined(CONFIG_IDF_TARGET_ESP32C5)
+#if (defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C61)) || defined(CONFIG_IDF_TARGET_ESP32C5)
 static void init_uart_c2_c6_c5(void)
 {
-	ESP_LOGD(TAG, "Set-up BLE for ESP32-C2/C6/C5");
+	ESP_LOGD(TAG, "Set-up BLE for ESP32-C2/C6/C61/C5");
 
-#if defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C5)
+#if defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C61) || defined(CONFIG_IDF_TARGET_ESP32C5)
 	//ESP_ERROR_CHECK( uart_set_pin(BLUETOOTH_UART, BT_TX_PIN,
 	//  BT_RX_PIN, BT_RTS_PIN, BT_CTS_PIN) );
 	ESP_LOGI(TAG, "UART Pins: Tx:%u Rx:%u", BT_TX_PIN, BT_RX_PIN);
@@ -427,7 +415,7 @@ void init_uart(void)
 {
 #if CONFIG_IDF_TARGET_ESP32
 	init_uart_esp32();
-#elif (defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32C6)) || defined(CONFIG_IDF_TARGET_ESP32C5)
+#elif (defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C61)) || defined(CONFIG_IDF_TARGET_ESP32C5)
 	init_uart_c2_c6_c5();
 #elif BT_OVER_C3_S3
 	init_uart_c3_s3();

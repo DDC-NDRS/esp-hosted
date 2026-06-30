@@ -1,9 +1,13 @@
 CC = gcc
 
-# Compiler and linker flags
-CROSS_COMPILE :=
-CFLAGS = -Wall -g -fPIC
-LDFLAGS = -lpthread -lrt
+# Compiler and linker flags. CROSS_COMPILE/SDKTARGETSYSROOT are overridable on
+# the command line (and propagate here from the c_support make), so a Yocto SDK
+# cross-build needs no edits: --sysroot is wired in only when SDKTARGETSYSROOT is set.
+CROSS_COMPILE ?=
+SDKTARGETSYSROOT ?=
+SYSROOT_FLAG := $(if $(SDKTARGETSYSROOT),--sysroot=$(SDKTARGETSYSROOT))
+CFLAGS = -Wall -g -fPIC $(SYSROOT_FLAG)
+LDFLAGS = $(SYSROOT_FLAG) -lpthread -lrt
 
 # Directory paths
 DIR_ROOT = $(CURDIR)/../..

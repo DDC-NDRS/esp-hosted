@@ -1,17 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 //
 
 #ifndef __STATS__H__
@@ -105,6 +93,9 @@ struct pkt_stats_t {
 	uint32_t hs_bus_sta_in;
 	uint32_t hs_bus_sta_out;
 	uint32_t hs_bus_sta_fail;
+	uint32_t hs_bus_ap_out;
+	uint32_t hs_bus_ap_fail;
+	uint32_t wifi_tx_retries;
 	uint32_t serial_rx;
 	uint32_t serial_tx_total;
 	uint32_t serial_tx_evt;
@@ -123,6 +114,11 @@ extern struct pkt_stats_t pkt_stats;
 
 void create_debugging_tasks(void);
 uint8_t debug_get_raw_tp_conf(void);
+
+#if TEST_RAW_TP
+/* Start raw-TP on host command (cmd = ESP_PRIV_CMD_RAW_TP_*). */
+void process_raw_tp_cmd(uint8_t cmd);
+#endif
 
 /* Add these declarations before the macros */
 

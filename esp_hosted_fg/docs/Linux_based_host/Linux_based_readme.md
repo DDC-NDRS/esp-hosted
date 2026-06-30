@@ -237,3 +237,9 @@ Following guide explains how to use ESP-Hosted solution.
 
 Following document explains guidelines for porting solution to other Linux platforms
 * [Porting Guide](./porting_guide.md)
+
+# 5. ESP-Hosted Migration & Upgrade Guide
+
+How to upgrade slave firmware + host driver together (incl. OTA ordering), the
+host/slave version-compatibility rules, and what a release's binary set contains.
+* [Migration & Upgrade Guide](./Migration_Guide.md)

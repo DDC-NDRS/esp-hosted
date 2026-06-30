@@ -1,17 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2022 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 //
 
 #include "stats.h"
@@ -244,8 +232,9 @@ static void raw_tp_timer_func(void* arg)
 	test_raw_tp_rx_len = test_raw_tp_tx_len = 0;
 }
 
-#if TEST_RAW_TP__ESP_TO_HOST
 extern volatile uint8_t datapath;
+/* Raw-TP TX task is started on demand. */
+static TaskHandle_t raw_tp_tx_task_hdl = NULL;
 static void raw_tp_tx_task(void* pvParameters)
 {
 	int ret;
@@ -266,8 +255,10 @@ static void raw_tp_tx_task(void* pvParameters)
 	for (;;) {
 
 		if (!datapath) {
-			sleep(1);
-			continue;
+			/* Exit when datapath closes. */
+			ESP_LOGI(TAG, "raw-TP tx: data path stopped, exiting task");
+			raw_tp_tx_task_hdl = NULL;
+			vTaskDelete(NULL);
 		}
 
 		buf_handle.if_type = ESP_TEST_IF;
@@ -288,7 +279,6 @@ static void raw_tp_tx_task(void* pvParameters)
 		test_raw_tp_tx_len += (TEST_RAW_TP__BUF_SIZE);
 	}
 }
-#endif /* TEST_RAW_TP__ESP_TO_HOST */
 #endif /* TEST_RAW_TP */
 
 #if ESP_PKT_STATS
@@ -301,9 +291,19 @@ static void stats_timer_func(void* arg)
 			pkt_stats.hs_bus_sta_in,pkt_stats.hs_bus_sta_out, pkt_stats.hs_bus_sta_fail,
 			pkt_stats.sta_sh_in,pkt_stats.sta_sh_out,
 			pkt_stats.serial_rx, pkt_stats.serial_tx_total, pkt_stats.serial_tx_evt);
+	ESP_LOGI(TAG, "AP: H2S(out[%lu] fail[%lu]) wifi_tx_retries[%lu]",
+			pkt_stats.hs_bus_ap_out, pkt_stats.hs_bus_ap_fail,
+			pkt_stats.wifi_tx_retries);
 	ESP_LOGI(TAG, "Lwip: in[%lu] slave_out[%lu] host_out[%lu] both_out[%lu]",
 			pkt_stats.sta_lwip_in, pkt_stats.sta_slave_lwip_out,
 			pkt_stats.sta_host_lwip_out, pkt_stats.sta_both_lwip_out);
+
+	/* Heap watermark stats. */
+	ESP_LOGI(TAG, "Heap: free[%u] min_ever[%u] largest[%u] dma_free[%u]",
+			(unsigned)esp_get_free_heap_size(),
+			(unsigned)esp_get_minimum_free_heap_size(),
+			(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL),
+			(unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 #ifdef ESP_FUNCTION_PROFILING
 	/* Print timing stats for all active entries */
@@ -349,21 +349,52 @@ static void start_timer_to_display_stats(int periodic_time_sec)
 #endif /* ESP_PKT_STATS */
 
 #if TEST_RAW_TP
+/* Keep timer handle alive after init. */
+static esp_timer_handle_t raw_tp_report_timer;
 static void start_timer_to_display_raw_tp(void)
 {
-	test_args_t args = {0};
-	esp_timer_handle_t raw_tp_timer = {0};
 	esp_timer_create_args_t create_args = {
 			.callback = &raw_tp_timer_func,
-			.arg = &args,
+			.arg = NULL,
 			.name = "raw_tp_timer",
 	};
 
-	ESP_ERROR_CHECK(esp_timer_create(&create_args, &raw_tp_timer));
+	ESP_ERROR_CHECK(esp_timer_create(&create_args, &raw_tp_report_timer));
+	ESP_ERROR_CHECK(esp_timer_start_periodic(raw_tp_report_timer, SEC_TO_USEC(TEST_RAW_TP__TIMEOUT)));
+}
 
-	args.timer = raw_tp_timer;
+static volatile uint8_t raw_tp_timer_started;
 
-	ESP_ERROR_CHECK(esp_timer_start_periodic(raw_tp_timer, SEC_TO_USEC(TEST_RAW_TP__TIMEOUT)));
+static void init_raw_tp_timer(void)
+{
+	if (raw_tp_timer_started)
+		return;
+	raw_tp_timer_started = 1;
+	start_timer_to_display_raw_tp();
+}
+
+static void init_raw_tp_test_task(void)
+{
+	if (raw_tp_tx_task_hdl)
+		return;
+	assert(xTaskCreate(raw_tp_tx_task, "raw_tp_tx_task",
+				CONFIG_ESP_DEFAULT_TASK_STACK_SIZE, NULL,
+				CONFIG_ESP_HOSTED_TASK_PRIORITY_DEFAULT, &raw_tp_tx_task_hdl) == pdTRUE);
+}
+
+/* Start raw-TP from a host command. */
+void process_raw_tp_cmd(uint8_t cmd)
+{
+	init_raw_tp_timer();
+
+	if (cmd == ESP_PRIV_CMD_RAW_TP_ESP_TO_HOST) {
+		ESP_LOGI(TAG, "RawTP: ESP->Host started");
+		init_raw_tp_test_task();
+	} else if (cmd == ESP_PRIV_CMD_RAW_TP_HOST_TO_ESP) {
+		ESP_LOGI(TAG, "RawTP: Host->ESP started");
+	} else {
+		ESP_LOGW(TAG, "RawTP: unknown cmd %u", cmd);
+	}
 }
 #endif /* TEST_RAW_TP */
 
@@ -375,14 +406,6 @@ void create_debugging_tasks(void)
 				CONFIG_ESP_HOSTED_TASK_PRIORITY_LOW, NULL) == pdTRUE);
 #endif /* CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS */
 
-#if TEST_RAW_TP
-	start_timer_to_display_raw_tp();
-  #if TEST_RAW_TP__ESP_TO_HOST
-	assert(xTaskCreate(raw_tp_tx_task , "raw_tp_tx_task",
-				CONFIG_ESP_DEFAULT_TASK_STACK_SIZE, NULL ,
-				CONFIG_ESP_HOSTED_TASK_PRIORITY_LOW, NULL) == pdTRUE);
-  #endif
-#endif
 #if ESP_PKT_STATS
 	start_timer_to_display_stats(ESP_PKT_STATS_REPORT_INTERVAL);
 #endif /* ESP_PKT_STATS */
@@ -395,11 +418,6 @@ uint8_t debug_get_raw_tp_conf(void) {
   #if TEST_RAW_TP__ESP_TO_HOST
 	raw_tp_cap |= ESP_TEST_RAW_TP__ESP_TO_HOST;
   #endif
-	if ((raw_tp_cap & ESP_TEST_RAW_TP__ESP_TO_HOST) == ESP_TEST_RAW_TP__ESP_TO_HOST)
-		ESP_LOGI(TAG, "\n\n*** Raw Throughput testing: ESP --> Host started ***\n");
-	else
-		ESP_LOGI(TAG, "\n\n*** Raw Throughput testing: Host --> ESP started ***\n");
 #endif
 	return raw_tp_cap;
 }
-

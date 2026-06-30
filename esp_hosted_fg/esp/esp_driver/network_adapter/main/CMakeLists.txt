@@ -39,7 +39,6 @@ else(CONFIG_ESP_SPI_HOST_INTERFACE)
 endif()
 
 register_component()
-target_compile_definitions(${COMPONENT_LIB} PRIVATE)
 
 # Add directory of protocomm_priv.h to include paths
 idf_component_get_property(protocomm_dir protocomm COMPONENT_DIR)

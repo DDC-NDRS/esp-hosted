@@ -1,22 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/*
- * Espressif Systems Wireless LAN device driver
- *
- * Copyright (C) 2015-2021 Espressif Systems (Shanghai) PTE LTD
- *
- * This software file (the "File") is distributed by Espressif Systems (Shanghai)
- * PTE LTD under the terms of the GNU General Public License Version 2, June 1991
- * (the "License").  You may use, redistribute and/or modify this File in
- * accordance with the terms and conditions of the License, a copy of which
- * is available by writing to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or on the
- * worldwide web at http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt.
- *
- * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
- * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
- * this warranty disclaimer.
- */
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 #include "esp_utils.h"
 
 #include <linux/init.h>
@@ -69,19 +52,24 @@ static int spi_cs = MOD_PARAM_UNINITIALISED;
 static int spi_mode = MOD_PARAM_UNINITIALISED; /* 1/2/3 */
 static int spi_handshake = MOD_PARAM_UNINITIALISED;
 static int spi_dataready = MOD_PARAM_UNINITIALISED;
+/* Raw throughput mode module param. */
+u32 raw_tp_mode = 0;
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Amey Inamdar <amey.inamdar@espressif.com>");
 MODULE_AUTHOR("Mangesh Malusare <mangesh.malusare@espressif.com>");
 MODULE_AUTHOR("Yogesh Mantri <yogesh.mantri@espressif.com>");
 MODULE_DESCRIPTION("Host driver for ESP-Hosted solution");
-MODULE_VERSION("0.0.5");
+MODULE_VERSION("2.0.0");
 
 module_param(resetpin, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(resetpin, "Host's GPIO pin number which is connected to ESP32's EN to reset ESP32 device");
 
 module_param(clockspeed, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(clockspeed, "SPI/SDIO bus clock freq (MHz)");
+
+module_param(raw_tp_mode, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(raw_tp_mode, "Mode chosen to test raw throughput");
 
 module_param(spi_bus, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(spi_bus, "SPI: bus instance to use");
@@ -488,11 +476,11 @@ static void esp_events_work(struct work_struct *work)
 	}
 }
 
-static void process_rx_packet(struct sk_buff *skb)
+/* Dispatch one validated frame; consumes skb. */
+static void process_skb(struct sk_buff *skb, u16 len, u16 offset)
 {
 	struct esp_private *priv = NULL;
 	struct esp_payload_header *payload_header = NULL;
-	u16 len = 0, offset = 0;
 	u16 rx_checksum = 0, checksum = 0;
 	int ret = 0, ret_len = 0;
 	struct esp_adapter *adapter = esp_get_adapter();
@@ -500,12 +488,9 @@ static void process_rx_packet(struct sk_buff *skb)
 	if (!skb)
 		return;
 
-	/* get the paload header */
 	payload_header = (struct esp_payload_header *) skb->data;
 
 	UPDATE_HEADER_RX_PKT_NO(payload_header);
-	len = le16_to_cpu(payload_header->len);
-	offset = le16_to_cpu(payload_header->offset);
 
 	if ((payload_header->flags & FLAG_WAKEUP_PKT) && (len<1500)) {
 		esp_hex_dump_dbg("Wake up rx: ", skb->data, (len+offset)>64? 64: (len+offset));
@@ -531,6 +516,12 @@ static void process_rx_packet(struct sk_buff *skb)
 		bool more = (payload_header->flags & MORE_FRAGMENT);
 		int if_num = payload_header->if_num;
 
+		if (if_num >= SERIAL_REASM_MAX_DEVS) {
+			esp_err("serial if_num out of range: %d\n", if_num);
+			dev_kfree_skb_any(skb);
+			return;
+		}
+
 		if (!more && !serial_reasm[if_num].active) {
 		do {
 			ret = esp_serial_data_received(payload_header->if_num,
@@ -543,12 +534,6 @@ static void process_rx_packet(struct sk_buff *skb)
 			ret_len += ret;
 		} while (ret_len < len);
 		dev_kfree_skb_any(skb);
-			return;
-		}
-
-		if (if_num >= SERIAL_REASM_MAX_DEVS) {
-			esp_err("serial if_num out of range: %d\n", if_num);
-			dev_kfree_skb_any(skb);
 			return;
 		}
 
@@ -645,7 +630,72 @@ static void process_rx_packet(struct sk_buff *skb)
 			update_test_raw_tp_rx_stats(len);
 		#endif
 		dev_kfree_skb_any(skb);
+	} else {
+		esp_verbose("Unknown if_type %d, dropping\n", payload_header->if_type);
+		dev_kfree_skb_any(skb);
 	}
+}
+
+#ifdef ESP_DEBUG_STATS
+/* Debug RX de-aggregation counters. */
+static atomic_t h2e_rx_blocks;
+static atomic_t h2e_rx_frames;
+static atomic_t h2e_rx_multiframe;
+static unsigned long h2e_rx_stats_jiffies;
+
+static void esp_print_h2e_rx_stats(void)
+{
+	unsigned long now = jiffies;
+
+	if (time_before(now, h2e_rx_stats_jiffies + 5 * HZ))
+		return;
+	h2e_rx_stats_jiffies = now;
+	esp_info("H2E rx: blocks=%d frames=%d multiframe=%d\n",
+		atomic_xchg(&h2e_rx_blocks, 0), atomic_xchg(&h2e_rx_frames, 0),
+		atomic_xchg(&h2e_rx_multiframe, 0));
+}
+#define H2E_RX_INC(c) atomic_inc(&(c))
+#else
+#define H2E_RX_INC(c) do { } while (0)
+static inline void esp_print_h2e_rx_stats(void) { }
+#endif
+
+/* Validate frame header. */
+static int is_valid_rx_packet(void *buf, u16 *len_a, u16 *offset_a)
+{
+	struct esp_payload_header *h = (struct esp_payload_header *)buf;
+	u16 len, offset;
+
+	if (!h || !len_a || !offset_a)
+		return 0;
+
+	len = le16_to_cpu(h->len);
+	offset = le16_to_cpu(h->offset);
+
+	if (!len || offset != H_ESP_PAYLOAD_HEADER_OFFSET)
+		return 0;
+
+	*len_a = len;
+	*offset_a = offset;
+	return 1;
+}
+
+/* Process one received frame. */
+static void process_rx_packet(struct sk_buff *skb)
+{
+	u16 len = 0, offset = 0;
+
+	if (!skb)
+		return;
+
+	/* read_packet() already returns one frame per skb. */
+	if (!is_valid_rx_packet(skb->data, &len, &offset)) {
+		esp_err("invalid payload at skb head\n");
+		dev_kfree_skb_any(skb);
+		return;
+	}
+
+	process_skb(skb, len, offset);
 }
 
 int esp_is_tx_queue_paused(void)
@@ -689,6 +739,7 @@ void esp_tx_resume(void)
     }
 }
 
+/* Drain RX FIFO in one workqueue run. */
 static int esp_get_packets(struct esp_adapter *adapter)
 {
 	struct sk_buff *skb = NULL;
@@ -696,20 +747,25 @@ static int esp_get_packets(struct esp_adapter *adapter)
 	if (!adapter || !adapter->if_ops || !adapter->if_ops->read)
 		return -EINVAL;
 
-	skb = adapter->if_ops->read(adapter);
-
-	if (!skb)
-		return -EFAULT;
-
-	process_rx_packet(skb);
+	while (1) {
+		if (atomic_read(&adapter->state) < ESP_CONTEXT_RX_READY)
+			return -EFAULT;
+		skb = adapter->if_ops->read(adapter);
+		if (!skb)
+			break;
+		process_rx_packet(skb);
+	}
 
 	return 0;
 }
 
 int esp_send_packet(struct esp_adapter *adapter, struct sk_buff *skb)
 {
-	if (!adapter || !adapter->if_ops || !adapter->if_ops->write)
+	/* Free skb here too so error paths keep a single ownership rule. */
+	if (!adapter || !adapter->if_ops || !adapter->if_ops->write) {
+		dev_kfree_skb(skb);
 		return -EINVAL;
+	}
 
 	return adapter->if_ops->write(adapter, skb);
 }

@@ -1,4 +1,11 @@
 repos:
+  - repo: https://github.com/espressif/check-copyright/
+    rev: v1.1.1
+    hooks:
+      - id: check-copyright
+        args: ['--config', 'esp_hosted_fg/tools/check_copyright_config.yaml']
+        files: ^esp_hosted_fg/
+
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:

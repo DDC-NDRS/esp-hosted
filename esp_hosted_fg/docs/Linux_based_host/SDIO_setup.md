@@ -1,7 +1,7 @@
 # Wi-Fi and BT/BLE connectivity Setup over SDIO
 
-| Supported Targets | ESP32 | ESP32-C6 | ESP32-C5 |
-| ----------------- | ----- | -------- | -------- |
+| Supported Targets | ESP32 | ESP32-C6/C61 | ESP32-C5 |
+| ----------------- | ----- | ------------ | -------- |
 
 > [!NOTE]
 > SDIO support for ESP32-C5 is currently in BETA. It is available as a `--preview` release in the `master` branch of ESP-IDF.

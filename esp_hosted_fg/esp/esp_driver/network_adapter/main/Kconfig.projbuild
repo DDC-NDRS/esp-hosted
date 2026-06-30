@@ -106,6 +106,39 @@ menu "Example Configuration"
 				Size of Rx queue for packets
 	endmenu
 
+	menu "SDIO Configuration"
+		depends on ESP_SDIO_HOST_INTERFACE
+
+		choice ESP_SDIO_TX_MODE
+			bool "SDIO E2H (slave->host) TX strategy"
+			default ESP_SDIO_TX_MODE_SW_AGGR
+			help
+				How the slave packs slave->host frames onto the SDIO bus.
+
+			config ESP_SDIO_TX_MODE_SW_AGGR
+				bool "SW aggregation (pack a batch into one buffer, blocking transmit)"
+
+			config ESP_SDIO_TX_MODE_STREAM
+				bool "Stream (one buffer per frame, SLC concatenates)"
+
+			config ESP_SDIO_TX_MODE_PACKET
+				bool "Packet (one frame per blocking transmit)"
+		endchoice
+
+		config ESP_SDIO_TX_MODE_VAL
+			int
+			default 0 if ESP_SDIO_TX_MODE_SW_AGGR
+			default 1 if ESP_SDIO_TX_MODE_STREAM
+			default 2 if ESP_SDIO_TX_MODE_PACKET
+
+		config ESP_SDIO_TX_DEBUG
+			bool "SDIO TX per-aggregate debug instrumentation"
+			default n
+			help
+				Per-aggregate frames/agg + KB/s log, plus a payload sequence number
+				(overwrites payload[0:4] - only safe for the raw-throughput test).
+	endmenu
+
 	menu "SPI Full-duplex Configuration"
 		depends on ESP_SPI_HOST_INTERFACE
 
@@ -250,7 +283,7 @@ menu "Example Configuration"
 			config ESP_SPI_GPIO_HANDSHAKE
 				int "Slave GPIO pin for handshake"
 				default 25 if IDF_TARGET_ESP32C5 && ESP_ESP32C5_SPI_RASPI_MATING_BOARD
-				default 3 if IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C5 || IDF_TARGET_ESP32C6
+				default 3 if IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C5 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C61
 				default 2
 				help
 					Slave GPIO pin to use for handshake with other spi controller
@@ -292,7 +325,7 @@ menu "Example Configuration"
 
 		config ESP_SDIO_STREAMING_MODE
 			bool "Enable SDIO Streaming Mode"
-			default n
+			default y
 			help
 				Enable Streaming Mode. Host to receive queued data from slave
 				as one stream instead of individual packets. This can improve
@@ -324,6 +357,7 @@ menu "Example Configuration"
 				int "CMD GPIO number"
 				range 15 15 if IDF_TARGET_ESP32
 				range 18 18 if IDF_TARGET_ESP32C6
+				range 18 18 if IDF_TARGET_ESP32C61
 				range 10 10 if IDF_TARGET_ESP32C5
 				help
 					"Value cannot be configured. Displayed for reference."
@@ -332,6 +366,7 @@ menu "Example Configuration"
 				int "CLK GPIO number"
 				range 14 14 if IDF_TARGET_ESP32
 				range 19 19 if IDF_TARGET_ESP32C6
+				range 19 19 if IDF_TARGET_ESP32C61
 				range 9 9 if IDF_TARGET_ESP32C5
 				help
 					"Value cannot be configured. Displayed for reference."
@@ -340,6 +375,7 @@ menu "Example Configuration"
 				int "D0 GPIO number"
 				range 2 2 if IDF_TARGET_ESP32
 				range 20 20 if IDF_TARGET_ESP32C6
+				range 20 20 if IDF_TARGET_ESP32C61
 				range 8 8 if IDF_TARGET_ESP32C5
 				help
 					"Value cannot be configured. Displayed for reference."
@@ -348,6 +384,7 @@ menu "Example Configuration"
 				int "D1 GPIO number"
 				range 4 4 if IDF_TARGET_ESP32
 				range 21 21 if IDF_TARGET_ESP32C6
+				range 21 21 if IDF_TARGET_ESP32C61
 				range 7 7 if IDF_TARGET_ESP32C5
 				help
 					"Value cannot be configured. Displayed for reference."
@@ -356,6 +393,7 @@ menu "Example Configuration"
 				int "D2 GPIO number"
 				range 12 12 if IDF_TARGET_ESP32
 				range 22 22 if IDF_TARGET_ESP32C6
+				range 22 22 if IDF_TARGET_ESP32C61
 				range 14 14 if IDF_TARGET_ESP32C5
 				help
 					"Value cannot be configured. Displayed for reference."
@@ -364,6 +402,7 @@ menu "Example Configuration"
 				int "D3 GPIO number"
 				range 13 13 if IDF_TARGET_ESP32
 				range 23 23 if IDF_TARGET_ESP32C6
+				range 23 23 if IDF_TARGET_ESP32C61
 				range 13 13 if IDF_TARGET_ESP32C5
 				help
 					"Value cannot be configured. Displayed for reference."
@@ -372,6 +411,7 @@ menu "Example Configuration"
 		choice
 			prompt "SDIO Slave Timing"
 			default ESP_SDIO_NSEND_PSAMPLE if IDF_TARGET_ESP32C6
+			default ESP_SDIO_NSEND_PSAMPLE if IDF_TARGET_ESP32C61
 			default ESP_SDIO_PSEND_PSAMPLE
 			help
 				Select the SDIO timing used by slave. Default value works with most
@@ -408,7 +448,7 @@ menu "Example Configuration"
 	config EXAMPLE_HCI_UART_BAUDRATE
 		int "UART Baudrate for HCI: Only applicable for ESP32-C3/ESP32-S3"
 		range 115200 921600
-		depends on IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6
+		depends on IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C61
 		depends on BT_CTRL_HCI_MODE_UART_H4
 		default 921600
 		help
@@ -450,9 +490,12 @@ menu "Example Configuration"
 	menu "Hosted Debugging"
 		config ESP_RAW_THROUGHPUT_TRANSPORT
 			bool "RawTP: Transport level throughput debug test"
-			default n
+			default y
 				help
-					Find max transport performance which helps to assess stability of porting done
+					Find max transport performance which helps to assess stability of porting done.
+					Compiled in by default; the test stays idle until the host starts it at
+					runtime (raw_tp_mode module param -> ESP_PRIV_IF command). Direction is
+					chosen at runtime, not build time.
 
 		config ESP_RAW_TP_ESP_TO_HOST_PKT_LEN
 			depends on ESP_RAW_THROUGHPUT_TRANSPORT
@@ -641,6 +684,7 @@ menu "Example Configuration"
 			int "Host wakeup GPIO"
 			default 23 if IDF_TARGET_ESP32 && !SPI_VSPI
 			default 2 if IDF_TARGET_ESP32C6
+			default 2 if IDF_TARGET_ESP32C61
 			default 1 if IDF_TARGET_ESP32C3
 			default 25 if IDF_TARGET_ESP32C5
 			default 6 if IDF_TARGET_ESP32C2 && C2_C5_MODULE_SUB_BOARD

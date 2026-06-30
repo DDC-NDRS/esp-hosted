@@ -6429,7 +6429,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_mac_address),
     &ctrl_msg__req__get_mac_address__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6441,7 +6441,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_mac_address),
     &ctrl_msg__req__set_mac_address__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6453,7 +6453,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_wifi_mode),
     &ctrl_msg__req__get_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6465,7 +6465,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_wifi_mode),
     &ctrl_msg__req__set_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6477,7 +6477,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_scan_ap_list),
     &ctrl_msg__req__scan_result__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6489,7 +6489,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_ap_config),
     &ctrl_msg__req__get_apconfig__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6501,7 +6501,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_connect_ap),
     &ctrl_msg__req__connect_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6513,7 +6513,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_disconnect_ap),
     &ctrl_msg__req__get_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6525,7 +6525,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_softap_config),
     &ctrl_msg__req__get_soft_apconfig__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6537,7 +6537,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_softap_vendor_specific_ie),
     &ctrl_msg__req__set_soft_apvendor_specific_ie__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6549,7 +6549,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_start_softap),
     &ctrl_msg__req__start_soft_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6561,7 +6561,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_softap_connected_stas_list),
     &ctrl_msg__req__soft_apconnected_sta__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6573,7 +6573,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_stop_softap),
     &ctrl_msg__req__get_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6585,7 +6585,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_power_save_mode),
     &ctrl_msg__req__set_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6597,7 +6597,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_power_save_mode),
     &ctrl_msg__req__get_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6609,7 +6609,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_ota_begin),
     &ctrl_msg__req__otabegin__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6621,7 +6621,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_ota_write),
     &ctrl_msg__req__otawrite__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6633,7 +6633,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_ota_end),
     &ctrl_msg__req__otaend__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6645,7 +6645,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_wifi_max_tx_power),
     &ctrl_msg__req__set_wifi_max_tx_power__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6657,7 +6657,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_wifi_curr_tx_power),
     &ctrl_msg__req__get_wifi_curr_tx_power__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6669,7 +6669,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_config_heartbeat),
     &ctrl_msg__req__config_heartbeat__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6681,7 +6681,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_enable_disable_feat),
     &ctrl_msg__req__enable_disable__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6693,7 +6693,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_fw_version),
     &ctrl_msg__req__get_fw_version__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6705,7 +6705,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_country_code),
     &ctrl_msg__req__set_country_code__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6717,7 +6717,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_country_code),
     &ctrl_msg__req__get_country_code__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6729,7 +6729,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_custom_rpc_unserialised_msg),
     &ctrl_msg__req__custom_rpc_unserialised_msg__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6741,7 +6741,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_set_dhcp_dns_status),
     &ctrl_msg__req__set_dhcp_dns_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6753,7 +6753,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, req_get_dhcp_dns_status),
     &ctrl_msg__req__get_dhcp_dns_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6765,7 +6765,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_mac_address),
     &ctrl_msg__resp__get_mac_address__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6777,7 +6777,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_mac_address),
     &ctrl_msg__resp__set_mac_address__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6789,7 +6789,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_wifi_mode),
     &ctrl_msg__resp__get_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6801,7 +6801,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_wifi_mode),
     &ctrl_msg__resp__set_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6813,7 +6813,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_scan_ap_list),
     &ctrl_msg__resp__scan_result__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6825,7 +6825,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_ap_config),
     &ctrl_msg__resp__get_apconfig__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6837,7 +6837,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_connect_ap),
     &ctrl_msg__resp__connect_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6849,7 +6849,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_disconnect_ap),
     &ctrl_msg__resp__get_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6861,7 +6861,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_softap_config),
     &ctrl_msg__resp__get_soft_apconfig__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6873,7 +6873,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_softap_vendor_specific_ie),
     &ctrl_msg__resp__set_soft_apvendor_specific_ie__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6885,7 +6885,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_start_softap),
     &ctrl_msg__resp__start_soft_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6897,7 +6897,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_softap_connected_stas_list),
     &ctrl_msg__resp__soft_apconnected_sta__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6909,7 +6909,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_stop_softap),
     &ctrl_msg__resp__get_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6921,7 +6921,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_power_save_mode),
     &ctrl_msg__resp__set_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6933,7 +6933,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_power_save_mode),
     &ctrl_msg__resp__get_mode__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6945,7 +6945,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_ota_begin),
     &ctrl_msg__resp__otabegin__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6957,7 +6957,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_ota_write),
     &ctrl_msg__resp__otawrite__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6969,7 +6969,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_ota_end),
     &ctrl_msg__resp__otaend__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6981,7 +6981,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_wifi_max_tx_power),
     &ctrl_msg__resp__set_wifi_max_tx_power__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -6993,7 +6993,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_wifi_curr_tx_power),
     &ctrl_msg__resp__get_wifi_curr_tx_power__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7005,7 +7005,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_config_heartbeat),
     &ctrl_msg__resp__config_heartbeat__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7017,7 +7017,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_enable_disable_feat),
     &ctrl_msg__resp__enable_disable__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7029,7 +7029,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_fw_version),
     &ctrl_msg__resp__get_fw_version__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7041,7 +7041,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_country_code),
     &ctrl_msg__resp__set_country_code__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7053,7 +7053,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_country_code),
     &ctrl_msg__resp__get_country_code__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7065,7 +7065,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_custom_rpc_unserialised_msg),
     &ctrl_msg__resp__custom_rpc_unserialised_msg__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7077,7 +7077,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_set_dhcp_dns_status),
     &ctrl_msg__resp__set_dhcp_dns_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7089,7 +7089,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, resp_get_dhcp_dns_status),
     &ctrl_msg__resp__get_dhcp_dns_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7101,7 +7101,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_esp_init),
     &ctrl_msg__event__espinit__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7113,7 +7113,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_heartbeat),
     &ctrl_msg__event__heartbeat__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7125,7 +7125,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_station_disconnect_from_ap),
     &ctrl_msg__event__station_disconnect_from_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7137,7 +7137,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_station_disconnect_from_esp_softap),
     &ctrl_msg__event__station_disconnect_from_espsoft_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7149,7 +7149,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_station_connected_to_ap),
     &ctrl_msg__event__station_connected_to_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7161,7 +7161,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_station_connected_to_esp_softap),
     &ctrl_msg__event__station_connected_to_espsoft_ap__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7173,7 +7173,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_custom_rpc_unserialised_msg),
     &ctrl_msg__event__custom_rpc_unserialised_msg__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
@@ -7185,7 +7185,7 @@ static const ProtobufCFieldDescriptor ctrl_msg__field_descriptors[68] =
     offsetof(CtrlMsg, event_set_dhcp_dns_status),
     &ctrl_msg__event__set_dhcp_dns_status__descriptor,
     NULL,
-    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0 | PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
 };

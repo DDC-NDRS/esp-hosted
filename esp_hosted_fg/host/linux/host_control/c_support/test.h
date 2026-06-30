@@ -1,22 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/*
- * Espressif Systems Wireless LAN device driver
- *
- * Copyright (C) 2015-2021 Espressif Systems (Shanghai) PTE LTD
- *
- * This software file (the "File") is distributed by Espressif Systems (Shanghai)
- * PTE LTD under the terms of the GNU General Public License Version 2, June 1991
- * (the "License").  You may use, redistribute and/or modify this File in
- * accordance with the terms and conditions of the License, a copy of which
- * is available by writing to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or on the
- * worldwide web at http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt.
- *
- * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
- * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
- * this warranty disclaimer.
- */
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 
 #ifndef __TEST_H__
 #define __TEST_H__
@@ -70,6 +53,12 @@ int test_ota_write(uint8_t* ota_data, uint32_t ota_data_len);
 int test_ota_end(void);
 int register_event_callbacks(void);
 int unregister_event_callbacks(void);
+
+/* STA connect result, set by the event callback. */
+enum { STA_CONN_PENDING = 0, STA_CONN_CONNECTED, STA_CONN_DISCONNECTED };
+extern volatile int g_sta_conn_result;
+int test_wait_sta_connect(int timeout_sec); /* optional blocking wait; returns STA_CONN_* */
+void test_set_run_dhcp_client(bool enable);
 int test_config_heartbeat(void);
 int test_disable_heartbeat(void);
 int test_disable_heartbeat_async(void);
