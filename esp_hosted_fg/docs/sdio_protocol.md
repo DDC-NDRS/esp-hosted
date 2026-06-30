@@ -60,3 +60,7 @@ bit 4: BT mode - BR/EDR only mode
 
 #### 1.1.4 Deinit peripheral device
 Host sets bit 1 of 0x3FF5508C interrupt register. This tells ESP peripheral to stop the data path.
+
+## References
+
+- [ESP SDIO Slave Protocol](https://espressif.github.io/idf-extra-components/latest/esp_serial_slave_link/sdio_slave_protocol.html) — the underlying ESP SDIO slave hardware/protocol that this transport builds on.

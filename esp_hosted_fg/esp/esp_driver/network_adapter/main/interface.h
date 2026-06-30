@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
+// SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
 
 #ifndef __TRANSPORT_LAYER_INTERFACE_H
 #define __TRANSPORT_LAYER_INTERFACE_H
@@ -79,9 +66,24 @@ typedef struct {
 #if CONFIG_ESP_SPI_HOST_INTERFACE
 #define MAX_TRANSPORT_BUF_SIZE 1600
 #elif CONFIG_ESP_SDIO_HOST_INTERFACE
-/* host->slave recv buffer = aggregation depth (sets host->ESP/WiFi-TX). MUST
- * match host ESP_RX_BUFFER_SIZE (esp_sdio_decl.h) or credit accounting breaks.
- * SDIO-only: SPI keeps the small per-transfer buffer (no aggregation/credit). */
+/* MAX_TRANSPORT_BUF_SIZE — SDIO recv-buffer size and flow-control credit unit.
+ *
+ * 15872 is only a fallback. The real size is found at runtime: the slave
+ * (sdio_init -> sdio_hw_max_rx_buf_size) reads this chip's DMA-descriptor limit,
+ * rounds down to a 512B multiple, allocates that, and tells the host in the boot
+ * TLV (ESP_PRIV_RX_BUF_CONFIG: e2h_bufsz_512B / h2e_bufsz_512B). The host uses
+ * the advertised size and falls back to its own 15872 only for an old (pre-TLV)
+ * slave. So this constant and the host's ESP_RX_BUFFER_SIZE need to match only
+ * on that fallback path.
+ *
+ * How 15872 is derived (the value the auto-detect returns on 14-bit chips):
+ *   14-bit descriptor length -> max 16383 B; CMD53 is 512B-aligned ->
+ *   floor(16383/512) = 31 blocks -> 31*512 = 15872 (16384 would overflow).
+ * Per chip (auto-detected, no manual table):
+ *   C5/C6/C61 and other 14-bit chips: 15872
+ *   ESP32 classic (12-bit): floor(4095/512)*512 = 3584
+ *
+ * SPI uses the small per-transfer buffer above (no aggregation/credit). */
 #define MAX_TRANSPORT_BUF_SIZE 15872
 #endif
 
